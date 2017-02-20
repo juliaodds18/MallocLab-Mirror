@@ -28,7 +28,7 @@
  *       Format!
  *
  * === User information ===
- * Group: BRAINS
+ * Group: CURLY_BRAINS
  * User 1: tinnats15
  * SSN: 0106902859
  * User 2:
@@ -39,7 +39,7 @@
  ********************************************************/
 team_t team = {
     /* Group name */
-    "BRAINS",
+    "CURLY_BRAINS",
     /* First member's full name */
     "Tinna Þuríður Sigurðardóttir",
     /* First member's email address */
