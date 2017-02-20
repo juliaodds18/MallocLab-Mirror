@@ -31,8 +31,8 @@
  * Group: CURLY_BRAINS
  * User 1: tinnats15
  * SSN: 0106902859
- * User 2:
- * SSN: X
+ * User 2: birkirb15
+ * SSN: 0205882179
  * User 3:
  * SSN: X
  * === End User Information ===
