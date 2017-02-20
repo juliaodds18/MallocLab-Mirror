@@ -28,9 +28,9 @@
  *       Format!
  *
  * === User information ===
- * Group:
- * User 1:
- * SSN: X
+ * Group: CURLY_BRAINS
+ * User 1: tinnats15
+ * SSN: 0106902859
  * User 2:
  * SSN: X
  * User 3:
@@ -39,11 +39,11 @@
  ********************************************************/
 team_t team = {
     /* Group name */
-    "AA_AmnesiacAnonymous",
+    "CURLY_BRAINS",
     /* First member's full name */
-    "Student Studentsson",
+    "Tinna Þuríður Sigurðardóttir",
     /* First member's email address */
-    "student16@ru.is",
+    "tinnats15@ru.is",
     /* Second member's full name (leave blank if none) */
     "",
     /* Second member's email address (leave blank if none) */
