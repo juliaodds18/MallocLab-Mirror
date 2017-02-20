@@ -158,3 +158,15 @@ void *mm_realloc(void *ptr, size_t size)
     mm_free(oldptr);
     return newptr;
 }
+
+/*
+ * REMOVE ANY CALLS TO THIS BEFORE HANDIN
+ * Consistency checker, for our own debugging during development.
+ * Print error messages when mm_check fails.
+ * Style points are given for this function.
+ * Put in comments and document what we are checking.
+ * Returns a non zero value (true) if and only if our heap is consistent
+ */
+int mm_check(void){
+
+}
