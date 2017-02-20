@@ -33,8 +33,8 @@
  * SSN: 0106902859
  * User 2: birkirb15
  * SSN: 0205882179
- * User 3:
- * SSN: X
+ * User 3: juliao15
+ * SSN: 1808962449
  * === End User Information ===
  ********************************************************/
 team_t team = {
@@ -49,9 +49,9 @@ team_t team = {
     /* Second member's email address (leave blank if none) */
     "birkirb15@ru.is",
     /* Third full name (leave blank if none) */
-    "",
+    "Júlía Oddsdóttir",
     /* Third member's email address (leave blank if none) */
-    ""
+    "juliao15@ru.is"
 };
 
 /* single word (4) or double word (8) alignment */
