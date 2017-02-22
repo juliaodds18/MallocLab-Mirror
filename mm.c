@@ -89,6 +89,13 @@ team_t team = {
 #define NEXT_BLKP(bp)	((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
 #define PREV_BLKP(bp)	((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
+/*Get the previous and next free pointer*/
+#define PREV_FREE(bp) ((HDRP(bp)) + WSIZE)
+#define NEXT_FREE(bp) ((FTRP(bp)) + WSIZE)
+
+/*Global variables*/
+char *start_ptr = 0x0; 
+
 /*
  * mm_init - initialize the malloc package.
  * ---
@@ -100,6 +107,10 @@ team_t team = {
  */
 int mm_init(void)
 {
+    /* Create inital emoty heap. Doing this now so I can use start_ptr */
+    if((start_ptr = mem_sbrk(4*WSIZE)) == (void *)-1) {
+	return -1;
+    }
     return 0;
 }
 
@@ -194,5 +205,17 @@ void *mm_realloc(void *ptr, size_t size)
  * Returns a non zero value (true) if and only if our heap is consistent
  */
 int mm_check(void){
+    
+    printf("Is every block in the free list actually free?");
+    char* iter;
 
+    for(iter = start_ptr; iter != NULL; iter = NEXT_FREE(iter)) {
+	iter = HDRP(iter);
+	if(GET_ALLOC(iter) != 0x1) {
+	    printf("Block at location %s is in free list but not free", iter);
+	    exit(-1);  //Should I exit?
+	}
+    } 
+    
+    return 0;
 }
