@@ -98,6 +98,8 @@ team_t team = {
 /*Global variables*/
 char *heap_start = 0x0; 
 char *free_start = 0x0;
+char *heap_end = 0x0;
+char *free_end = 0x0;
 /*
  * mm_init - initialize the malloc package.
  * ---
@@ -115,6 +117,8 @@ int mm_init(void)
     }
 
     free_start = heap_start;
+    heap_end = mem_heap_hi();
+    free_end = heap_end;
     return 0;
 }
 
@@ -280,6 +284,30 @@ int mm_check(void){
 	}
 
 	iter = NEXT_BLKP(iter);
+    }
+
+    /*Check if pointers in heap point to valid addresses. If they are less than heap_start or greater than heap_end, then they are invalid.*/
+
+    printf("Do pointers in heap point to valid addresses? \n");
+    
+    iter = free_start; 
+    while(iter != NULL) {
+	char* next = NEXT_FREE(iter);
+	
+	if(next < heap_start || next > heap_end) {
+	    printf("Pointer in blcok %s points out of bounds.", iter);
+	}
+	iter = next;
+    }
+
+    iter = free_end;
+    while(iter != NULL) {
+	char* prev = PREV_FREE(iter);
+
+	if(prev < heap_start || prev > heap_end) {
+	    printf("Pointer in block %s points out of bounds.", iter);
+	}
+	iter = prev;
     }
     return 0;
 }
