@@ -64,9 +64,9 @@ team_t team = {
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 /*Basic constraints and macros*/
-#define WSIZE		4	/* Word and header/footer size in bytes*/
-#define DSIZE		8	/* Double word size in bytes */
-#define CHUNKSIZE	(1<<12) /* Original size of heap. Also extends the heap by this amount. */
+#define WSIZE       4   /* Word and header/footer size in bytes*/
+#define DSIZE       8   /* Double word size in bytes */
+#define CHUNKSIZE   (1<<12) /* Original size of heap. Also extends the heap by this amount. */
 
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 
@@ -74,29 +74,29 @@ team_t team = {
 #define PACK(size, alloc) ((size) | (alloc))
 
 /*Read and write a word at address p. p is a void ptr*/
-#define GET(p)	(*(unsigned int *)(p))
-#define PUT(p)	(*(unsigned int *)(p) = (val))
+#define GET(p)  (*(unsigned int *)(p))
+#define PUT(p)  (*(unsigned int *)(p) = (val))
 
 /*Read the size and allocated fields from address p*/
-#define GET_SIZE(p)	(GET(p) & ~0x7)  /*Return size from header/footer*/
-#define GET_ALLOC(p)	(GET(p) & 0x1)   /*Return alloc from header/footer*/
+#define GET_SIZE(p) (GET(p) & ~0x7)  /*Return size from header/footer*/
+#define GET_ALLOC(p)    (GET(p) & 0x1)   /*Return alloc from header/footer*/
 #define GET_NEXTFREE(p) (GET(p) & 0x2)
 #define GET_PREVFREE(p) (GET(p) & 0x4)
 
 /*Given block ptr bp, compute address of its header and footer*/
-#define HDRP(bp)	((char *)(bp) - WSIZE)
-#define FTRP(bp)	((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
+#define HDRP(bp)    ((char *)(bp) - WSIZE)
+#define FTRP(bp)    ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
 
 /*Given block ptr bp, compute address of next and previous blocks*/
-#define NEXT_BLKP(bp)	((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
-#define PREV_BLKP(bp)	((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
+#define NEXT_BLKP(bp)   ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
+#define PREV_BLKP(bp)   ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 /*Get the previous and next free pointer*/
 #define PREV_FREE(bp) ((HDRP(bp)) + WSIZE)
 #define NEXT_FREE(bp) ((FTRP(bp)) - WSIZE)
 
 /*Global variables*/
-char *heap_start = 0x0; 
+char *heap_start = 0x0;
 char *free_start = 0x0;
 /*
  * mm_init - initialize the malloc package.
@@ -111,7 +111,7 @@ int mm_init(void)
 {
     /* Create inital emoty heap. Doing this now so I can use start_ptr */
     if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1) {
-	return -1;
+        return -1;
     }
 
     free_start = heap_start;
@@ -209,77 +209,77 @@ void *mm_realloc(void *ptr, size_t size)
  * Returns a non zero value (true) if and only if our heap is consistent
  */
 int mm_check(void){
-    
+
     printf("Is every block in the free list actually free?\n");
     char* iter;
 
     for(iter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
-	iter = HDRP(iter);
-	if(GET_ALLOC(iter) != 0x1) {
-	    printf("Block at location %s is in free list but not free\n", iter);
-	    exit(-1);  //Should I exit?
-	}
-    } 
+        iter = HDRP(iter);
+        if(GET_ALLOC(iter) != 0x1) {
+            printf("Block at location %s is in free list but not free\n", iter);
+            exit(-1);  //Should I exit?
+        }
+    }
 
 
     printf("Are there any contiguous free blocks that somehow escaped coalescing?\n");
-    
+
     /* Going through free list, checking both previous and next blocks. If they are free, then they have ecaped coalescing.*/
-    
-    iter = free_start; 
+
+    iter = free_start;
     while(iter != NULL) {
-	int isnextalloc = GET_NEXTFREE(iter);
-	int isprevalloc = GET_PREVFREE(iter);
+        int isnextalloc = GET_NEXTFREE(iter);
+        int isprevalloc = GET_PREVFREE(iter);
 
-	if(!isnextalloc) {
-	    printf("Both current block and next block are free. Escpaed coalescing.\n");
-	}
-	if(!isprevalloc) {
-	    printf("Both current block and previous block are free. Escaped coalescing.\n");
-	}
+        if(!isnextalloc) {
+            printf("Both current block and next block are free. Escpaed coalescing.\n");
+        }
+        if(!isprevalloc) {
+            printf("Both current block and previous block are free. Escaped coalescing.\n");
+        }
 
-	iter = NEXT_FREE(iter);
+        iter = NEXT_FREE(iter);
     }
 
 
     /* For each free block, go through free list, see if there is a match. If not, there is a free block not in the free list.*/
     printf("Is every free block actually in the free list? \n");
-    
+
     iter = heap_start;
     while (iter != NULL) {
-	int isalloc = GET_ALLOC(iter);
+        int isalloc = GET_ALLOC(iter);
 
-	if(!isalloc) {
-	    int found = 0; 
-	    for(char* freeiter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
-		if(iter == freeiter) {
-		    found = 1;
-		    break;
-		}
-	    }
-	    
-	    if(!found) {
-	    	printf("Block at location %s is free but not in the free list.", iter);
-	    }
-	}
-	iter = NEXT_BLKP(iter);
+        if(!isalloc) {
+            int found = 0;
+            for(char* freeiter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
+                if(iter == freeiter) {
+                    found = 1;
+                    break;
+                }
+            }
+
+            if(!found) {
+                printf("Block at location %s is free but not in the free list.", iter);
+            }
+        }
+        iter = NEXT_BLKP(iter);
     }
 
     /*Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap. */
 
     printf("Do any allocd blocks overlap?\n");
 
-    iter = heap_start; 
+    iter = heap_start;
     while (iter != NULL) {
-	int headersize = GET_SIZE(iter);
-	char* footer = FTRP(iter);
-	int footersize = GET_SIZE(footer);
+        int headersize = GET_SIZE(iter);
+        char* footer = FTRP(iter);
+        int footersize = GET_SIZE(footer);
 
-	if(headersize != footersize) {
-	    printf("The header and footer do not have the same size. There has been an overlap.\n");
-	}
+        if(headersize != footersize) {
+            printf("The header and footer do not have the same size. There has been an overlap.\n");
+        }
 
-	iter = NEXT_BLKP(iter);
+        iter = NEXT_BLKP(iter);
     }
     return 0;
 }
