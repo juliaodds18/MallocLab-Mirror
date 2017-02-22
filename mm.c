@@ -80,6 +80,8 @@ team_t team = {
 /*Read the size and allocated fields from address p*/
 #define GET_SIZE(p)	(GET(p) & ~0x7)  /*Return size from header/footer*/
 #define GET_ALLOC(p)	(GET(p) & 0x1)   /*Return alloc from header/footer*/
+#define GET_NEXTFREE(p) (GET(p) & 0x2)
+#define GET_PREVFREE(p) (GET(p) & 0x4)
 
 /*Given block ptr bp, compute address of its header and footer*/
 #define HDRP(bp)	((char *)(bp) - WSIZE)
@@ -91,11 +93,11 @@ team_t team = {
 
 /*Get the previous and next free pointer*/
 #define PREV_FREE(bp) ((HDRP(bp)) + WSIZE)
-#define NEXT_FREE(bp) ((FTRP(bp)) + WSIZE)
+#define NEXT_FREE(bp) ((FTRP(bp)) - WSIZE)
 
 /*Global variables*/
-char *start_ptr = 0x0; 
-
+char *heap_start = 0x0; 
+char *free_start = 0x0;
 /*
  * mm_init - initialize the malloc package.
  * ---
@@ -108,9 +110,11 @@ char *start_ptr = 0x0;
 int mm_init(void)
 {
     /* Create inital emoty heap. Doing this now so I can use start_ptr */
-    if((start_ptr = mem_sbrk(4*WSIZE)) == (void *)-1) {
+    if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1) {
 	return -1;
     }
+
+    free_start = heap_start;
     return 0;
 }
 
@@ -206,16 +210,76 @@ void *mm_realloc(void *ptr, size_t size)
  */
 int mm_check(void){
     
-    printf("Is every block in the free list actually free?");
+    printf("Is every block in the free list actually free?\n");
     char* iter;
 
-    for(iter = start_ptr; iter != NULL; iter = NEXT_FREE(iter)) {
+    for(iter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
 	iter = HDRP(iter);
 	if(GET_ALLOC(iter) != 0x1) {
-	    printf("Block at location %s is in free list but not free", iter);
+	    printf("Block at location %s is in free list but not free\n", iter);
 	    exit(-1);  //Should I exit?
 	}
     } 
+
+
+    printf("Are there any contiguous free blocks that somehow escaped coalescing?\n");
     
+    /* Going through free list, checking both previous and next blocks. If they are free, then they have ecaped coalescing.*/
+    
+    iter = free_start; 
+    while(iter != NULL) {
+	int isnextalloc = GET_NEXTFREE(iter);
+	int isprevalloc = GET_PREVFREE(iter);
+
+	if(!isnextalloc) {
+	    printf("Both current block and next block are free. Escpaed coalescing.\n");
+	}
+	if(!isprevalloc) {
+	    printf("Both current block and previous block are free. Escaped coalescing.\n");
+	}
+
+	iter = NEXT_FREE(iter);
+    }
+
+
+    /* For each free block, go through free list, see if there is a match. If not, there is a free block not in the free list.*/
+    printf("Is every free block actually in the free list? \n");
+    
+    iter = heap_start;
+    while (iter != NULL) {
+	int isalloc = GET_ALLOC(iter);
+
+	if(!isalloc) {
+	    int found = 0; 
+	    for(char* freeiter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
+		if(iter == freeiter) {
+		    found = 1;
+		    break;
+		}
+	    }
+	    
+	    if(!found) {
+	    	printf("Block at location %s is free but not in the free list.", iter);
+	    }
+	}
+	iter = NEXT_BLKP(iter);
+    }
+
+    /*Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap. */
+
+    printf("Do any allocd blocks overlap?\n");
+
+    iter = heap_start; 
+    while (iter != NULL) {
+	int headersize = GET_SIZE(iter);
+	char* footer = FTRP(iter);
+	int footersize = GET_SIZE(footer);
+
+	if(headersize != footersize) {
+	    printf("The header and footer do not have the same size. There has been an overlap.\n");
+	}
+
+	iter = NEXT_BLKP(iter);
+    }
     return 0;
 }
