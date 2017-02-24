@@ -67,6 +67,7 @@ team_t team = {
 #define WSIZE       4   /* Word and header/footer size in bytes*/
 #define DSIZE       8   /* Double word size in bytes */
 #define CHUNKSIZE   (1<<12) /* Original size of heap. Also extends the heap by this amount. */
+#define OVERHEAD    8   /* overhead of header and footer */
 
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 
@@ -75,7 +76,7 @@ team_t team = {
 
 /*Read and write a word at address p. p is a void ptr*/
 #define GET(p)  (*(unsigned int *)(p))
-#define PUT(p)  (*(unsigned int *)(p) = (val))
+#define PUT(p, val)    (*(size_t *)(p) = (val))
 
 /*Read the size and allocated fields from address p*/
 #define GET_SIZE(p) (GET(p) & ~0x7)  /*Return size from header/footer*/
@@ -100,6 +101,8 @@ char *heap_start = 0x0;
 char *free_start = 0x0;
 char *heap_end = 0x0;
 char *free_end = 0x0;
+// mm-firstfit
+char *heap_listp;
 
 /* Function declerations */
 int mm_init(void);
@@ -130,14 +133,31 @@ int mm_check(void);
 int mm_init(void)
 {
     /* Create inital emoty heap. Doing this now so I can use start_ptr */
-    if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1) {
+    // if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1) {
+    //     return -1;
+    // }
+
+    // free_start = heap_start;
+    // heap_end = mem_heap_hi();
+    // free_end = heap_end;
+    // return 0;
+
+    /* FROM mm_firstfit.c */
+    if ((heap_listp = mem_sbrk(4*WSIZE)) == NULL) {
         return -1;
     }
+    PUT(heap_listp, 0);                        /* alignment padding */
+    PUT(heap_listp+WSIZE, PACK(OVERHEAD, 1));  /* prologue header */
+    PUT(heap_listp+DSIZE, PACK(OVERHEAD, 1));  /* prologue footer */
+    PUT(heap_listp+WSIZE+DSIZE, PACK(0, 1));   /* epilogue header */
+    heap_listp += DSIZE;
 
-    free_start = heap_start;
-    heap_end = mem_heap_hi();
-    free_end = heap_end;
+    /* Extend the empty heap with a free block of CHUNKSIZE bytes */
+    if (extend_heap(CHUNKSIZE/WSIZE) == NULL) {
+        return -1;
+    }
     return 0;
+
 }
 
 /*
@@ -154,15 +174,47 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1) {
+    // int newsize = ALIGN(size + SIZE_T_SIZE);
+    // void *p = mem_sbrk(newsize);
+    // if (p == (void *)-1) {
+    //     return NULL;
+    // }
+    // else {
+    //     *(size_t *)p = size;
+    //     return (void *)((char *)p + SIZE_T_SIZE);
+    // }
+
+    /* FROM mm_firstfit.c */
+    size_t asize;      /* adjusted block size */
+    size_t extendsize; /* amount to extend heap if no fit */
+    char *bp;
+
+    /* Ignore spurious requests */
+    if (size <= 0) {
         return NULL;
     }
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+
+    /* Adjust block size to include overhead and alignment reqs. */
+    if (size <= DSIZE) {
+        asize = DSIZE + OVERHEAD;
     }
+    else {
+        asize = DSIZE * ((size + (OVERHEAD) + (DSIZE-1)) / DSIZE);
+    }
+
+    /* Search the free list for a fit */
+    if ((bp = find_fit(asize)) != NULL) {
+        place(bp, asize);
+        return bp;
+    }
+
+    /* No fit found. Get more memory and place the block */
+    extendsize = MAX(asize,CHUNKSIZE);
+    if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+        return NULL;
+    }
+    place(bp, asize);
+    return bp;
 }
 
 /*
@@ -175,6 +227,12 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *ptr)
 {
+    /* FROM mm_firstfit.c */
+    size_t size = GET_SIZE(HDRP(ptr));
+
+    PUT(HDRP(ptr), PACK(size, 0));
+    PUT(FTRP(ptr), PACK(size, 0));
+    coalesce(ptr);
 }
 
 /*
@@ -205,21 +263,37 @@ void mm_free(void *ptr)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    void *oldptr = ptr;
-    void *newptr;
+    // void *oldptr = ptr;
+    // void *newptr;
+    // size_t copySize;
+
+    // newptr = mm_malloc(size);
+    // if (newptr == NULL) {
+    //     return NULL;
+    // }
+    // copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    // if (size < copySize) {
+    //     copySize = size;
+    // }
+    // memcpy(newptr, oldptr, copySize);
+    // mm_free(oldptr);
+    // return newptr;
+
+    /* FROM mm_firstfit.c */
+    void *newp;
     size_t copySize;
 
-    newptr = mm_malloc(size);
-    if (newptr == NULL) {
-        return NULL;
+    if ((newp = mm_malloc(size)) == NULL) {
+        printf("ERROR: mm_malloc failed in mm_realloc\n");
+        exit(1);
     }
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
+    copySize = GET_SIZE(HDRP(ptr));
     if (size < copySize) {
         copySize = size;
     }
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
-    return newptr;
+    memcpy(newp, ptr, copySize);
+    mm_free(ptr);
+    return newp;
 }
 
 /*
