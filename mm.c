@@ -69,10 +69,12 @@ team_t team = {
 #define CHUNKSIZE   (1<<12) /* Original size of heap. Also extends the heap by this amount. */
 #define OVERHEAD    8   /* overhead of header and footer */
 
+
 #define MAX(x, y) ((x) > (y)? (x) : (y))
 
 /*Pack a size and allocated bit into a word. Value of header and footer*/
-#define PACK(size, alloc) ((size) | (alloc))
+//#define PACK(size, alloc) ((size) | (alloc))
+#define PACK(size, prev_alloc, next_alloc, alloc) ((size)|(prev_alloc << 2) |(next_alloc << 1)|(alloc)));
 
 /*Read and write a word at address p. p is a void ptr*/
 #define GET(p)  (*(unsigned int *)(p))
@@ -133,23 +135,19 @@ int mm_check(void);
 int mm_init(void)
 {
     /* Create inital emoty heap. Doing this now so I can use start_ptr */
-    // if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1) {
-    //     return -1;
-    // }
+    if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1) {
+         return -1;
+    }
 
-    // free_start = heap_start;
-    // heap_end = mem_heap_hi();
+    //free_start = heap_start;
+    heap_end = mem_heap_hi();
     // free_end = heap_end;
     // return 0;
 
     /* FROM mm_firstfit.c */
-    if ((heap_listp = mem_sbrk(4*WSIZE)) == NULL) {
-        return -1;
-    }
-    PUT(heap_listp, 0);                        /* alignment padding */
-    PUT(heap_listp+WSIZE, PACK(OVERHEAD, 1));  /* prologue header */
-    PUT(heap_listp+DSIZE, PACK(OVERHEAD, 1));  /* prologue footer */
-    PUT(heap_listp+WSIZE+DSIZE, PACK(0, 1));   /* epilogue header */
+
+   
+    
     heap_listp += DSIZE;
 
     /* Extend the empty heap with a free block of CHUNKSIZE bytes */
@@ -229,6 +227,15 @@ void mm_free(void *ptr)
 {
     /* FROM mm_firstfit.c */
     size_t size = GET_SIZE(HDRP(ptr));
+
+    //TODO, what if there is no prev or next block
+    // Letting adjacent blocks know about our freeness
+
+    void* prev_ptr = PREV_BLKP(ptr);
+    size_t prev_head = GET(HDRP(prev_ptr));
+    size_t new_prev_head = prev_head & ~0x2;
+    PUT(HDRP(prev_ptr), new_prev_head);
+    PUT(FTRP(prev_ptr), new_prev_head);
 
     PUT(HDRP(ptr), PACK(size, 0));
     PUT(FTRP(ptr), PACK(size, 0));
@@ -452,10 +459,16 @@ static void *extend_heap(size_t words)
         return NULL;
     }
 
+    if(bp == heap_start) {
+        PUT(HDRP(bp), PACK(size, 1, 1, 0));         /* free block header */
+        PUT(FTRP(bp), PACK(size, 1, 1, 0));         /* free block footer */
+    }
+    else {
+        //TODO: finish
+    }
     /* Initialize free block header/footer and the epilogue header */
     PUT(HDRP(bp), PACK(size, 0));         /* free block header */
     PUT(FTRP(bp), PACK(size, 0));         /* free block footer */
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* new epilogue header */
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
@@ -474,15 +487,15 @@ static void place(void *bp, size_t asize)
     size_t csize = GET_SIZE(HDRP(bp));
 
     if ((csize - asize) >= (DSIZE + OVERHEAD)) {
-        PUT(HDRP(bp), PACK(asize, 1));
-        PUT(FTRP(bp), PACK(asize, 1));
+        PUT(HDRP(bp), PACK(asize, 1, 0, 1));
+        PUT(FTRP(bp), PACK(asize, 1, 0, 1));
         bp = NEXT_BLKP(bp);
-        PUT(HDRP(bp), PACK(csize-asize, 0));
-        PUT(FTRP(bp), PACK(csize-asize, 0));
+        PUT(HDRP(bp), PACK(csize-asize, 1, 1, 0));
+        PUT(FTRP(bp), PACK(csize-asize, 1, 1, 0));
     }
     else {
-        PUT(HDRP(bp), PACK(csize, 1));
-        PUT(FTRP(bp), PACK(csize, 1));
+        PUT(HDRP(bp), PACK(csize, 1, 1, 1));
+        PUT(FTRP(bp), PACK(csize, 1, 1, 1));
     }
 }
 /* $end mmplace */
@@ -508,29 +521,30 @@ static void *find_fit(size_t asize)
  */
 static void *coalesce(void *bp)
 {
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
-    size_t size = GET_SIZE(HDRP(bp));
+    void *head = HDRP(bp);
+    size_t prev_alloc = GET_PREVFREE(head);
+    size_t next_alloc = GET_NEXTFREE(head);
+    size_t size = GET_SIZE(head);
 
     if (prev_alloc && next_alloc) {            /* Case 1 */
         return bp;
     }
     else if (prev_alloc && !next_alloc) {      /* Case 2 */
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        PUT(HDRP(bp), PACK(size, 0));
-        PUT(FTRP(bp), PACK(size,0));
+        PUT(HDRP(bp), PACK(size, 1, 1, 0));
+        PUT(FTRP(bp), PACK(size, 1, 1, 0));
     }
     else if (!prev_alloc && next_alloc) {      /* Case 3 */
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 1, 1, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 1, 1, 0));
         bp = PREV_BLKP(bp);
     }
     else {                                     /* Case 4 */
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
             GET_SIZE(FTRP(NEXT_BLKP(bp)));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 1, 1, 0));
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 1, 1, 0));
         bp = PREV_BLKP(bp);
     }
 
