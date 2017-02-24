@@ -100,6 +100,15 @@ char *heap_start = 0x0;
 char *free_start = 0x0;
 char *heap_end = 0x0;
 char *free_end = 0x0;
+
+/* Function declerations */
+int mm_init(void);
+void *mm_malloc(size_t size);
+void mm_free(void *ptr);
+void *mm_realloc(void *ptr, size_t size);
+int mm_check(void);
+
+
 /*
  * mm_init - initialize the malloc package.
  * ---
@@ -212,8 +221,8 @@ void *mm_realloc(void *ptr, size_t size)
  * Put in comments and document what we are checking.
  * Returns a non zero value (true) if and only if our heap is consistent
  */
-int mm_check(void){
-
+int mm_check(void)
+{
     printf("Is every block in the free list actually free?\n");
     char* iter;
 
@@ -289,25 +298,25 @@ int mm_check(void){
     /*Check if pointers in heap point to valid addresses. If they are less than heap_start or greater than heap_end, then they are invalid.*/
 
     printf("Do pointers in heap point to valid addresses? \n");
-    
-    iter = free_start; 
+
+    iter = free_start;
     while(iter != NULL) {
-	char* next = NEXT_FREE(iter);
-	
-	if(next < heap_start || next > heap_end) {
-	    printf("Pointer in blcok %s points out of bounds.", iter);
-	}
-	iter = next;
+        char* next = NEXT_FREE(iter);
+
+        if(next < heap_start || next > heap_end) {
+        printf("Pointer in blcok %s points out of bounds.", iter);
+        }
+	   iter = next;
     }
 
     iter = free_end;
     while(iter != NULL) {
-	char* prev = PREV_FREE(iter);
+        char* prev = PREV_FREE(iter);
 
-	if(prev < heap_start || prev > heap_end) {
-	    printf("Pointer in block %s points out of bounds.", iter);
-	}
-	iter = prev;
+        if(prev < heap_start || prev > heap_end) {
+            printf("Pointer in block %s points out of bounds.", iter);
+        }
+        iter = prev;
     }
     return 0;
 }
