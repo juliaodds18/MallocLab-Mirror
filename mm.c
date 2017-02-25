@@ -153,6 +153,7 @@ int mm_init(void)
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL) {
         return -1;
     }
+    printf("Reached end of mm_init\n");
     return 0;
 }
 
@@ -197,19 +198,26 @@ void *mm_malloc(size_t size)
     else {
         asize = DSIZE * ((size + (OVERHEAD) + (DSIZE-1)) / DSIZE);
     }
+    
+    printf("Size: %d\n", asize);
 
     /* Search the free list for a fit */
     if ((bp = find_fit(asize)) != NULL) {
-        place(bp, asize);
+        printf("Finds fit, before place\n");
+	place(bp, asize);
+	printf("Free fit found\n");
         return bp;
     }
 
+    printf("Free fit not found, need to extend heap\n");    
     /* No fit found. Get more memory and place the block */
     extendsize = MAX(asize,CHUNKSIZE);
     if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
         return NULL;
     }
     place(bp, asize);
+
+    printf("Reached end of malloc\n");
     return bp;
 }
 
@@ -250,6 +258,7 @@ void mm_free(void *ptr)
     PUT(HDRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
     PUT(FTRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
     coalesce(ptr);
+	
 }
 
 /*
@@ -519,7 +528,7 @@ static void *find_fit(size_t asize)
     /* first fit search */
     void *bp;
 
-    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+    for (bp = heap_start; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
         if (!GET_ALLOC(HDRP(bp)) && (asize <= GET_SIZE(HDRP(bp)))) {
             return bp;
         }
