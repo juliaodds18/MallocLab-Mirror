@@ -85,8 +85,8 @@ team_t team = {
 /*Read the size and allocated fields from address p*/
 #define GET_SIZE(p) (GET(p) & ~0x7)  /*Return size from header/footer*/
 #define GET_ALLOC(p)    (GET(p) & 0x1)   /*Return alloc from header/footer*/
-#define GET_NEXTFREE(p) (GET(p) & 0x2)
-#define GET_PREVFREE(p) (GET(p) & 0x4)
+#define GET_NEXTFREE(p) ((GET(p) & 0x2) >> 1)
+#define GET_PREVFREE(p) ((GET(p) & 0x4) >> 2)
 
 /*Given block ptr bp, compute address of its header and footer*/
 #define HDRP(bp)    ((char *)(bp) - WSIZE)
@@ -106,7 +106,7 @@ char *free_start = 0x0;
 char *heap_end = 0x0;
 char *free_end = 0x0;
 // mm-firstfit
-char *heap_listp;
+//char *heap_listp;
 
 /* Function declerations */
 int mm_init(void);
@@ -124,7 +124,6 @@ static void checkblock(void *bp);
 
 int mm_check(void);
 
-
 /*
  * mm_init - initialize the malloc package.
  * ---
@@ -141,15 +140,17 @@ int mm_init(void)
          return -1;
     }
 
-    //free_start = heap_start;
-    heap_end = mem_heap_hi();
-    // free_end = heap_end;
-
-    /* FROM mm_firstfit.c */
+    free_start = heap_start + WSIZE;   //Word behind header
+    heap_end = mem_heap_hi()-3;        //is this correct? hi returns brk-1, so last footer would be brk-4 = (brk - 1)-3?
+    free_end = heap_end - WSIZE;       //Word in front of footer
     
-    heap_listp += DSIZE;
+    //Initializing header and footer
+    //Using size DSIZE, since the only space is reserved for the prev and next pointers, DSIZE = 8 bytes.
+    PUT(heap_start, PACK(DSIZE, 1, 1, 0));
+    PUT(heap_end, PACK(DSIZE, 1, 1, 0));
 
-    /* Extend the empty heap with a free block of CHUNKSIZE bytes */
+ 
+    // Extend the empty heap with a free block of CHUNKSIZE bytes 
     if (extend_heap(CHUNKSIZE/WSIZE) == NULL) {
         return -1;
     }
@@ -171,6 +172,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
+    printf("MALLOC %d BYTES\n", size);
     // int newsize = ALIGN(size + SIZE_T_SIZE);
     // void *p = mem_sbrk(newsize);
     // if (p == (void *)-1) {
@@ -199,13 +201,13 @@ void *mm_malloc(size_t size)
         asize = DSIZE * ((size + (OVERHEAD) + (DSIZE-1)) / DSIZE);
     }
     
-    printf("Size: %d\n", asize);
+    printf("Aligned size: %d\n", asize);
 
     /* Search the free list for a fit */
     if ((bp = find_fit(asize)) != NULL) {
         printf("Finds fit, before place\n");
 	place(bp, asize);
-	printf("Free fit found\n");
+	printf("Free fit found, block placed\n");
         return bp;
     }
 
@@ -218,6 +220,7 @@ void *mm_malloc(size_t size)
     place(bp, asize);
 
     printf("Reached end of malloc\n");
+    printblock(bp);
     return bp;
 }
 
@@ -230,15 +233,19 @@ void *mm_malloc(size_t size)
  * or mm_realloc and has not yet been freed.
  */
 void mm_free(void *ptr)
-{
+{ 
+    //If ptr is NULL
+    if (!ptr) 
+	return;
+
     /* FROM mm_firstfit.c */
     size_t size = GET_SIZE(HDRP(ptr));
-
+    printf("FREE %d BYTES\n", size);
     //TODO, what if there is no prev or next block
     // Letting adjacent blocks know about our freeness
+    // WHAT IF PREV_PTR IS OUT OF BOUNDS BUT NOT NULL??
     void* prev_ptr = PREV_BLKP(ptr);
     if(prev_ptr != NULL) {
-        void* prev_head_ptr = HDRP(prev_ptr);
         size_t prev_head = GET(HDRP(prev_ptr)); //prev_head_ptr
         size_t new_prev_head = prev_head & ~0x2;
         PUT(HDRP(prev_ptr), new_prev_head);
@@ -247,7 +254,6 @@ void mm_free(void *ptr)
 
     void* next_ptr = NEXT_BLKP(ptr);
     if(next_ptr != NULL) {
-        void* next_head_ptr = HDRP(next_ptr);
         size_t next_head = GET(HDRP(next_ptr));
         size_t new_next_head = next_head & ~0x4;
         PUT(HDRP(next_ptr), new_next_head);
@@ -257,6 +263,7 @@ void mm_free(void *ptr)
 
     PUT(HDRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
     PUT(FTRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
+    printf("End of free, need to coalesce\n");    
     coalesce(ptr);
 	
 }
@@ -435,18 +442,18 @@ int mm_check(void)
  */
 void mm_checkheap(int verbose)
 {
-    char *bp = heap_listp;
+    char *bp = heap_start;
 
     if (verbose) {
-        printf("Heap (%p):\n", heap_listp);
+        printf("Heap (%p):\n", heap_start);
     }
 
-    if ((GET_SIZE(HDRP(heap_listp)) != DSIZE) || !GET_ALLOC(HDRP(heap_listp))) {
+    if ((GET_SIZE(HDRP(heap_start)) != DSIZE) || !GET_ALLOC(HDRP(heap_start))) {
         printf("Bad prologue header\n");
     }
-    checkblock(heap_listp);
+    checkblock(heap_start);
 
-    for (bp = heap_listp; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
+    for (bp = heap_start; GET_SIZE(HDRP(bp)) > 0; bp = NEXT_BLKP(bp)) {
         if (verbose) {
             printblock(bp);
     }
@@ -477,26 +484,20 @@ static void *extend_heap(size_t words)
     if ((bp = mem_sbrk(size)) == (void *)-1) {
         return NULL;
     }
+    printf("Extending heap by %d bytes\n", size);
 
-    // if this is the start of the heap, set both prev and next as allocated
-    // this is done so that the coalescing doesn't get out of hand
-    if(bp == heap_start) {
-        PUT(HDRP(bp), PACK(size, 1, 1, 0));         /* free block header */
-        PUT(FTRP(bp), PACK(size, 1, 1, 0));         /* free block footer */
-    }
-    else {
-        // the previous block needs to know about the extension
-        void* prev_ptr = PREV_BLKP(ptr);
-        void* prev_head_ptr = HDRP(prev_ptr);
-        size_t prev_head = GET(HDRP(prev_ptr)); //prev_head_ptr
-        size_t new_prev_head = prev_head & ~0x2;
-        PUT(HDRP(prev_ptr), new_prev_head);
-        PUT(FTRP(prev_ptr), new_prev_head);
+    // the previous block needs to know about the extension
+    void* prev_ptr = PREV_BLKP(bp);
+    void* prev_head_ptr = HDRP(prev_ptr);
+    size_t prev_head = GET(HDRP(prev_ptr));
+    size_t new_prev_head = prev_head & ~0x2;
+    PUT(HDRP(prev_ptr), new_prev_head);
+    PUT(FTRP(prev_ptr), new_prev_head);
 
-        // Initialize free block header/footer
-        PUT(HDRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block header */
-        PUT(FTRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block footer */
-    }
+    // Initialize free block header/footer
+    PUT(HDRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block header */
+    PUT(FTRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block footer */
+    printf("Finishes extending heap\n");
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
@@ -549,33 +550,38 @@ static void *find_fit(size_t asize)
  */
 static void *coalesce(void *bp)
 {
+    printf("Entering coalesce\n");
     void *head = HDRP(bp);
     size_t prev_alloc = GET_PREVFREE(head);
     size_t next_alloc = GET_NEXTFREE(head);
     size_t size = GET_SIZE(head);
 
     if (prev_alloc && next_alloc) {            /* Case 1 */
-        return bp;
+        printf("Case 1, return bp\n");
+	return bp;
     }
     else if (prev_alloc && !next_alloc) {      /* Case 2 */
+	printf("Case 2, next block free\n");
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 1, 1, 0));
         PUT(FTRP(bp), PACK(size, 1, 1, 0));
     }
     else if (!prev_alloc && next_alloc) {      /* Case 3 */
+	printf("Case 3, previous block free\n");
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         PUT(FTRP(bp), PACK(size, 1, 1, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 1, 1, 0));
         bp = PREV_BLKP(bp);
     }
-    else {                                     /* Case 4 */
+    else if (!prev_alloc && !next_alloc) {                                     /* Case 4 */
+	printf("Case 4, both blocks free\n");
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
             GET_SIZE(FTRP(NEXT_BLKP(bp)));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 1, 1, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 1, 1, 0));
         bp = PREV_BLKP(bp);
     }
-
+    printf("Returning from coalesce \n");
     return bp;
 }
 
