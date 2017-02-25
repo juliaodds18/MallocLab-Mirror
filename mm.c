@@ -485,6 +485,14 @@ static void *extend_heap(size_t words)
         PUT(FTRP(bp), PACK(size, 1, 1, 0));         /* free block footer */
     }
     else {
+        // the previous block needs to know about the extension
+        void* prev_ptr = PREV_BLKP(ptr);
+        void* prev_head_ptr = HDRP(prev_ptr);
+        size_t prev_head = GET(HDRP(prev_ptr)); //prev_head_ptr
+        size_t new_prev_head = prev_head & ~0x2;
+        PUT(HDRP(prev_ptr), new_prev_head);
+        PUT(FTRP(prev_ptr), new_prev_head);
+
         // Initialize free block header/footer
         PUT(HDRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block header */
         PUT(FTRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block footer */
