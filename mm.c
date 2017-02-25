@@ -260,10 +260,11 @@ void mm_free(void *ptr)
         PUT(FTRP(next_ptr), new_next_head);
     }
 
-
     PUT(HDRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
     PUT(FTRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
+
     printf("End of free, need to coalesce\n");    
+
     coalesce(ptr);
 	
 }
@@ -484,12 +485,24 @@ static void *extend_heap(size_t words)
     if ((bp = mem_sbrk(size)) == (void *)-1) {
         return NULL;
     }
+
     printf("Extending heap by %d bytes\n", size);
 
     // the previous block needs to know about the extension
     void* prev_ptr = PREV_BLKP(bp);
     void* prev_head_ptr = HDRP(prev_ptr);
     size_t prev_head = GET(HDRP(prev_ptr));
+
+    heap_end = mem_heap_hi();
+    // if this is the start of the heap, set both prev and next as allocated
+    // this is done so that the coalescing doesn't get out of hand
+    /*if(heap_end == heap_start) {
+        PUT(HDRP(bp), PACK(size, 1, 1, 0));         // free block header 
+        PUT(FTRP(bp), PACK(size, 1, 1, 0));         // free block footer 
+    }
+    */    
+
+
     size_t new_prev_head = prev_head & ~0x2;
     PUT(HDRP(prev_ptr), new_prev_head);
     PUT(FTRP(prev_ptr), new_prev_head);
@@ -498,6 +511,7 @@ static void *extend_heap(size_t words)
     PUT(HDRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block header */
     PUT(FTRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block footer */
     printf("Finishes extending heap\n");
+    
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
