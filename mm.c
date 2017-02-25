@@ -74,11 +74,13 @@ team_t team = {
 
 /*Pack a size and allocated bit into a word. Value of header and footer*/
 //#define PACK(size, alloc) ((size) | (alloc))
-#define PACK(size, prev_alloc, next_alloc, alloc) ((size)|(prev_alloc << 2) |(next_alloc << 1)|(alloc)));
+//#define PACK(size, prev_alloc, next_alloc, alloc) ((size)|((prev_alloc) << 2) |((next_alloc) << 1)|(alloc)))
+#define PACK(size, prev_alloc, next_alloc, alloc) ((size)| ((prev_alloc) << 2) | ((next_alloc) << 1)|(alloc))
+
 
 /*Read and write a word at address p. p is a void ptr*/
 #define GET(p)  (*(unsigned int *)(p))
-#define PUT(p, val)    (*(size_t *)(p) = (val))
+#define PUT(p, val)    (*(unsigned int *)(p) = (val))
 
 /*Read the size and allocated fields from address p*/
 #define GET_SIZE(p) (GET(p) & ~0x7)  /*Return size from header/footer*/
@@ -142,11 +144,8 @@ int mm_init(void)
     //free_start = heap_start;
     heap_end = mem_heap_hi();
     // free_end = heap_end;
-    // return 0;
 
     /* FROM mm_firstfit.c */
-
-   
     
     heap_listp += DSIZE;
 
@@ -155,7 +154,6 @@ int mm_init(void)
         return -1;
     }
     return 0;
-
 }
 
 /*
@@ -230,15 +228,27 @@ void mm_free(void *ptr)
 
     //TODO, what if there is no prev or next block
     // Letting adjacent blocks know about our freeness
-
     void* prev_ptr = PREV_BLKP(ptr);
-    size_t prev_head = GET(HDRP(prev_ptr));
-    size_t new_prev_head = prev_head & ~0x2;
-    PUT(HDRP(prev_ptr), new_prev_head);
-    PUT(FTRP(prev_ptr), new_prev_head);
+    if(prev_ptr != NULL) {
+        void* prev_head_ptr = HDRP(prev_ptr);
+        size_t prev_head = GET(HDRP(prev_ptr)); //prev_head_ptr
+        size_t new_prev_head = prev_head & ~0x2;
+        PUT(HDRP(prev_ptr), new_prev_head);
+        PUT(FTRP(prev_ptr), new_prev_head);
+    }
 
-    PUT(HDRP(ptr), PACK(size, 0));
-    PUT(FTRP(ptr), PACK(size, 0));
+    void* next_ptr = NEXT_BLKP(ptr);
+    if(next_ptr != NULL) {
+        void* next_head_ptr = HDRP(next_ptr);
+        size_t next_head = GET(HDRP(next_ptr));
+        size_t new_next_head = next_head & ~0x4;
+        PUT(HDRP(next_ptr), new_next_head);
+        PUT(FTRP(next_ptr), new_next_head);
+    }
+
+
+    PUT(HDRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
+    PUT(FTRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
     coalesce(ptr);
 }
 
@@ -459,16 +469,17 @@ static void *extend_heap(size_t words)
         return NULL;
     }
 
+    // if this is the start of the heap, set both prev and next as allocated
+    // this is done so that the coalescing doesn't get out of hand
     if(bp == heap_start) {
         PUT(HDRP(bp), PACK(size, 1, 1, 0));         /* free block header */
         PUT(FTRP(bp), PACK(size, 1, 1, 0));         /* free block footer */
     }
     else {
-        //TODO: finish
+        // Initialize free block header/footer
+        PUT(HDRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block header */
+        PUT(FTRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block footer */
     }
-    /* Initialize free block header/footer and the epilogue header */
-    PUT(HDRP(bp), PACK(size, 0));         /* free block header */
-    PUT(FTRP(bp), PACK(size, 0));         /* free block footer */
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
