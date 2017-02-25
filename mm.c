@@ -246,9 +246,9 @@ void mm_free(void *ptr)
         PUT(FTRP(next_ptr), new_next_head);
     }
 
-
     PUT(HDRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
     PUT(FTRP(ptr), (PACK(size, GET_PREVFREE(HDRP(ptr)), GET_NEXTFREE(HDRP(ptr)), 0)));
+
     coalesce(ptr);
 }
 
@@ -468,26 +468,27 @@ static void *extend_heap(size_t words)
     if ((bp = mem_sbrk(size)) == (void *)-1) {
         return NULL;
     }
-
+    heap_end = mem_heap_hi();
     // if this is the start of the heap, set both prev and next as allocated
     // this is done so that the coalescing doesn't get out of hand
-    if(bp == heap_start) {
-        PUT(HDRP(bp), PACK(size, 1, 1, 0));         /* free block header */
-        PUT(FTRP(bp), PACK(size, 1, 1, 0));         /* free block footer */
+    /*if(heap_end == heap_start) {
+        PUT(HDRP(bp), PACK(size, 1, 1, 0));         // free block header 
+        PUT(FTRP(bp), PACK(size, 1, 1, 0));         // free block footer 
     }
-    else {
-        // the previous block needs to know about the extension
-        void* prev_ptr = PREV_BLKP(ptr);
-        void* prev_head_ptr = HDRP(prev_ptr);
-        size_t prev_head = GET(HDRP(prev_ptr)); //prev_head_ptr
-        size_t new_prev_head = prev_head & ~0x2;
-        PUT(HDRP(prev_ptr), new_prev_head);
-        PUT(FTRP(prev_ptr), new_prev_head);
+    */
+    //else {
+    // the previous block needs to know about the extension
+    void* prev_ptr = PREV_BLKP(bp);    
+    void* prev_head_ptr = HDRP(prev_ptr);
+    size_t prev_head = GET(HDRP(prev_ptr)); //prev_head_ptr
+    size_t new_prev_head = prev_head & ~0x2;
+    PUT(HDRP(prev_ptr), new_prev_head);
+    PUT(FTRP(prev_ptr), new_prev_head);
 
-        // Initialize free block header/footer
-        PUT(HDRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block header */
-        PUT(FTRP(bp), PACK(size, GET_ALLOC(heap_end), 1, 0));         /* free block footer */
-    }
+    // Initialize free block header/footer 
+    PUT(HDRP(bp), PACK(size, GET_ALLOC(prev_ptr), 1, 0));         // free block header 
+    PUT(FTRP(bp), PACK(size, GET_ALLOC(prev_ptr), 1, 0));         // free block footer 
+    //)}
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
