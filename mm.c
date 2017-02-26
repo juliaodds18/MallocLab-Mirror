@@ -119,6 +119,7 @@ int mm_init(void)
     heap_end = mem_heap_hi();
     // set head and foot
     void *first_free = heap_start + WSIZE;
+    printf("heap_start %p\n", heap_start);
     printf("first free: %p\n", first_free);
 
     PUT(heap_start, PACK(CHUNKSIZE-OVERHEAD, 1, 1, 0));
