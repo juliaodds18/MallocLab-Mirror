@@ -28,31 +28,32 @@
  *       Format!
  *
  * === User information ===
- * Group: 
- * User 1: 
- * SSN: X
- * User 2: 
- * SSN: X
- * User 3: 
- * SSN: X
+ * Group: CURLY_BRAINS
+ * User 1: tinnats15
+ * SSN: 0106902859
+ * User 2: birkirb15
+ * SSN: 0205882179
+ * User 3: juliao15
+ * SSN: 1808962449
  * === End User Information ===
  ********************************************************/
 team_t team = {
     /* Group name */
-    "AA_AmnesiacAnonymous",
+    "CURLY_BRAINS",
     /* First member's full name */
-    "Student Studentsson",
+    "Tinna Þuríður Sigurðardóttir",
     /* First member's email address */
-    "student16@ru.is",
+    "tinnats15@ru.is",
     /* Second member's full name (leave blank if none) */
-    "",
+    "Birkir Brynjarsson",
     /* Second member's email address (leave blank if none) */
-    "",
+    "birkirb15@ru.is",
     /* Third full name (leave blank if none) */
-    "",
+    "Júlía Oddsdóttir",
     /* Third member's email address (leave blank if none) */
-    ""
+    "juliao15@ru.is"
 };
+
 
 /* single word (4) or double word (8) alignment */
 #define ALIGNMENT 8
