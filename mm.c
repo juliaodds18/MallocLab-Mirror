@@ -114,14 +114,23 @@ static void *coalesce(void *bp);
  */
 int mm_init(void)
 {
-    // set the start and end pointers 
-    heap_start = mem_sbrk(CHUNKSIZE);
+    // set the start and end pointers
+    if((heap_start = mem_sbrk(CHUNKSIZE)) == (void *)-1){
+        return -1;
+    }
     heap_end = mem_heap_hi();
+
     // set head and foot
     void *first_free = heap_start + WSIZE;
+
+    // initialize free list
+    free_start = first_free;
+    free_end = free_start;
+    PUT(PREV_FREE(first_free), 0);
+    PUT(NEXT_FREE(first_free), 0);
+
     printf("heap_start %p\n", heap_start);
     printf("first free: %p\n", first_free);
-
     PUT(heap_start, PACK(CHUNKSIZE-OVERHEAD, 1, 1, 0));
     PUT(FTRP(first_free), PACK(CHUNKSIZE-OVERHEAD, 1, 1, 0));
 
