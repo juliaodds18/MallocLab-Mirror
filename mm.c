@@ -55,20 +55,75 @@ team_t team = {
 };
 
 
-/* single word (4) or double word (8) alignment */
+// single word (4) or double word (8) alignment 
 #define ALIGNMENT 8
 
-/* rounds up to the nearest multiple of ALIGNMENT */
+// rounds up to the nearest multiple of ALIGNMENT 
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
-
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
+
+#define WSIZE       4   // Word and header/footer size in bytes
+#define DSIZE       8   // Double word size in bytes 
+#define OVERHEAD    8   // overhead of header and footer 
+#define CHUNKSIZE   (1<<12) // original size of heap and the smallest extension size
+
+#define PACK(size, prev_alloc, next_alloc, alloc) ((size)| ((prev_alloc) << 2) | ((next_alloc) << 1)|(alloc))
+// Read and write a word at address p. p is a void ptr
+#define GET(p)  (*(unsigned int *)(p))
+#define PUT(p, val)    (*(unsigned int *)(p) = (val))
+
+// Read the size and allocated fields from address p
+#define GET_SIZE(p) (GET(p) & ~0x7)  // Return size from header/footer
+#define GET_ALLOC(p)    (GET(p) & 0x1)   // Return alloc from header/footer
+#define GET_NEXTFREE(p) ((GET(p) & 0x2) >> 1)
+#define GET_PREVFREE(p) ((GET(p) & 0x4) >> 2)
+
+// Given block ptr bp, compute address of its header and footer
+#define HDRP(bp)    ((char *)(bp) - WSIZE)
+#define FTRP(bp)    ((char *)(bp) + GET_SIZE(HDRP(bp)) - DSIZE)
+
+// Given block ptr bp, compute address of next and previous blocks
+#define NEXT_BLKP(bp)   ((char *)(bp) + GET_SIZE(((char *)(bp) - WSIZE)))
+#define PREV_BLKP(bp)   ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
+
+// Get the previous and next free pointer
+#define PREV_FREE(bp) ((HDRP(bp)) + WSIZE)
+#define NEXT_FREE(bp) ((FTRP(bp)) - WSIZE)
+
+// Global variables
+char *heap_start = 0x0;
+char *free_start = 0x0;
+char *heap_end = 0x0;
+char *free_end = 0x0;
+
+// Function declerations 
+int mm_init(void);
+void *mm_malloc(size_t size);
+void mm_free(void *ptr);
+void *mm_realloc(void *ptr, size_t size);
+
+// function prototypes for internal helper routines -- From mm-firstfit.c 
+static void *extend_heap(size_t words);
+static void place(void *bp, size_t asize);
+static void *find_fit(size_t asize);
+static void *coalesce(void *bp);
 
 /* 
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
 {
+    // set the start and end pointers 
+    heap_start = mem_sbrk(CHUNKSIZE);
+    heap_end = mem_heap_hi();
+    // set head and foot
+    void *first_free = heap_start + WSIZE;
+    printf("first free: %p\n", first_free);
+
+    PUT(heap_start, PACK(CHUNKSIZE-OVERHEAD, 1, 1, 0));
+    PUT(FTRP(first_free), PACK(CHUNKSIZE-OVERHEAD, 1, 1, 0));
+
     return 0;
 }
 
