@@ -479,39 +479,39 @@ static void *extend_heap(size_t words)
 {
     char *bp;
     size_t size;
+    
+    int firstExtend = 0;
+    printf("Heap_end: %p  - heap_start: %p  - Space between: %d\n", heap_end, heap_start, (heap_end-heap_start));
+    if ((heap_end - heap_start) == 3*WSIZE) {
+	firstExtend = 1;
+	printf("EXTEND HEAP FOR FIRST TIME \n");
+    }    
 
     /* Allocate an even number of words to maintain alignment */
     size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
     if ((bp = mem_sbrk(size)) == (void *)-1) {
         return NULL;
     }
-
+        //WHAT IF HEAP SIZE IS 16 BEFORE EXTENSION? Then there is no need to change previous block, everything is free
     printf("Extending heap by %d bytes\n", size);
 
+    if(!firstExtend) {
     // the previous block needs to know about the extension
-    void* prev_ptr = PREV_BLKP(bp);
-    void* prev_head_ptr = HDRP(prev_ptr);
-    size_t prev_head = GET(HDRP(prev_ptr));
+        void* prev_ptr = PREV_BLKP(bp);
+        void* prev_head_ptr = HDRP(prev_ptr);
+        size_t prev_head = GET(HDRP(prev_ptr));
 
-    heap_end = mem_heap_hi();
-    // if this is the start of the heap, set both prev and next as allocated
-    // this is done so that the coalescing doesn't get out of hand
-    /*if(heap_end == heap_start) {
-        PUT(HDRP(bp), PACK(size, 1, 1, 0));         // free block header 
-        PUT(FTRP(bp), PACK(size, 1, 1, 0));         // free block footer 
+        heap_end = mem_heap_hi();
+
+        size_t new_prev_head = prev_head & ~0x2;
+        PUT(HDRP(prev_ptr), new_prev_head);
+        PUT(FTRP(prev_ptr), new_prev_head);
+
+        // Initialize free block header/footer
+        PUT(HDRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block header */
+        PUT(FTRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block footer */
+        printf("Finishes extending heap\n");
     }
-    */    
-
-
-    size_t new_prev_head = prev_head & ~0x2;
-    PUT(HDRP(prev_ptr), new_prev_head);
-    PUT(FTRP(prev_ptr), new_prev_head);
-
-    // Initialize free block header/footer
-    PUT(HDRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block header */
-    PUT(FTRP(bp), PACK(size, GET_ALLOC(prev_head_ptr), 1, 0));         /* free block footer */
-    printf("Finishes extending heap\n");
-    
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
