@@ -61,6 +61,8 @@ team_t team = {
 // rounds up to the nearest multiple of ALIGNMENT 
 #define ALIGN(size) (((size) + (ALIGNMENT-1)) & ~0x7)
 
+#define MAX(x, y)  ((x) > (y) ? (x) : (y))
+
 #define SIZE_T_SIZE (ALIGN(sizeof(size_t)))
 
 #define WSIZE       4   // Word and header/footer size in bytes
@@ -88,8 +90,8 @@ team_t team = {
 #define PREV_BLKP(bp)   ((char *)(bp) - GET_SIZE(((char *)(bp) - DSIZE)))
 
 // Get the previous and next free pointer
-#define PREV_FREE(bp) ((HDRP(bp)) + WSIZE)
-#define NEXT_FREE(bp) ((FTRP(bp)) - WSIZE)
+#define PREV_FREE(bp) (*(void **)((HDRP(bp)) + WSIZE))
+#define NEXT_FREE(bp) (*(void **)((FTRP(bp)) - WSIZE))
 
 // Global variables
 char *heap_start = 0x0;
@@ -108,6 +110,7 @@ static void *extend_heap(size_t words);
 static void place(void *bp, size_t asize);
 static void *find_fit(size_t asize);
 static void *coalesce(void *bp);
+static void remove_from_free(void* bp); 
 
 /* 
  * mm_init - initialize the malloc package.
@@ -143,7 +146,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
+    /*int newsize = ALIGN(size + SIZE_T_SIZE);
     void *p = mem_sbrk(newsize);
     if (p == (void *)-1) {
         return NULL;
@@ -151,7 +154,38 @@ void *mm_malloc(size_t size)
     else {
         *(size_t *)p = size;
         return (void *)((char *)p + SIZE_T_SIZE);
+    }*/
+
+    size_t alignedSize; 
+    size_t extendSize; 
+    char* bp; 
+
+    //Ignore empty requests
+    if(size == 0) {
+	return NULL;
     }
+
+    //Adjust block size to include overhead and alignment
+    alignedSize = MAX(ALIGN(size), (OVERHEAD + DSIZE));
+
+    //Search free list for a fit. If it's there, place the block down. 
+    if((bp = find_fit(alignedSize))) {
+	place(bp, alignedSize);
+	return bp;
+    }       
+
+    //Since there is no fit found, we need to extend the heap. Find size to extend for.
+    extendSize = MAX(alignedSize, CHUNKSIZE);
+
+    //No fit found, get more memory by extending heap and place the block.
+    if((bp = extend_heap(extendSize/WSIZE)) == NULL) {
+	return NULL;
+    }
+
+    //Now we can place, since the heap is larger
+    place(bp, alignedSize);
+
+    return bp;
 }
 
 /*
@@ -181,4 +215,70 @@ void *mm_realloc(void *ptr, size_t size)
     memcpy(newptr, oldptr, copySize);
     mm_free(oldptr);
     return newptr;
+}
+
+static void *find_fit(size_t size) {
+
+    //Pointer to search through the free list
+    void *bp; 
+
+
+    //Traverse the free list. Not sure about the middle condition?? 
+    for (bp = free_start; GET_ALLOC(HDRP(bp)) == 0; bp = NEXT_FREE(bp)) {
+
+	//If our size is smaller than the size of the block, return that block
+	if (size <= GET_SIZE(HDRP(bp))) {
+	    return bp; 
+	}
+    }
+
+    //No fit, need to extend.
+    return NULL; 
+}
+
+static void place(void* bp, size_t size) {
+    
+    size_t blockSize = GET_SIZE(HDRP(bp)); 
+
+    //Free block is larger than the space needed
+    if((blockSize - size) >= (OVERHEAD + DSIZE)) {
+	PUT(HDRP(bp), PACK(size, 1, 0, 1));  //Prev block alloc, next block free, current block alloc
+	PUT(FTRP(bp), PACK(size, 1, 0, 1));
+	
+	//Remove the current block from free list
+	remove_from_free(bp);
+
+	//Fetch the next block to resize
+	bp = NEXT_BLKP(bp);
+	PUT(HDRP(bp), PACK(blockSize - size, 1, 1, 0)); //Prev block alloc, next block alloc, current block free
+	PUT(FTRP(bp), PACK(blockSize - size, 1, 1, 0));
+	//TODO: ADD IT TO FREE LIST, coalesce? 
+    }
+    //Block fits perfectly
+    else {
+	PUT(HDRP(bp), PACK(size, 1, 1, 1)); 
+	PUT(FTRP(bp), PACK(size, 1, 1, 1));
+	remove_from_free(bp);
+    }
+}
+
+static void remove_from_free(void* bp) {
+
+    // If there is a previous free block, make it point to the header of the next block
+    if (PREV_FREE(bp)) {
+	NEXT_FREE(PREV_FREE(bp)) = HDRP(NEXT_FREE(bp));
+    }
+    // If not, then it is the new start of the list
+    else {
+	free_start = HDRP(NEXT_FREE(bp));
+    }
+
+    // If there is a next block, make it point to the header of the previous block
+    if(NEXT_FREE(bp)) {
+	PREV_FREE(NEXT_FREE(bp)) = HDRP(PREV_FREE(bp));
+    }
+    else {
+	free_end = HDRP(PREV_FREE(bp));
+    }
+    
 }
