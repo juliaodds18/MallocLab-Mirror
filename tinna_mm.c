@@ -140,8 +140,8 @@ int mm_init(void)
     PUT(heap_start, PACK(CHUNKSIZE, 1, 1, 0));
     PUT(FTRP(first_free), PACK(CHUNKSIZE, 1, 1, 0));
    
-    // PUT(PREV_FREE(first_free), 0);
-    // PUT(NEXT_FREE(first_free), 0);
+    PUT(PREV_FREE(first_free), *heap_start);
+    PUT(NEXT_FREE(first_free), *heap_end);
 
 
     PUT(free_start, 0);
@@ -176,11 +176,10 @@ void *mm_malloc(size_t size)
     if(size <= 0) {
         return NULL;
     }
- 
+
     //Adjust block size to include overhead and alignment
     alignedSize = MAX(ALIGN(size), (OVERHEAD + DSIZE));
     printf("Aligned size: %d\n", alignedSize);
-
 
     //Search free list for a fit. If it's there, place the block down. 
     if((bp = find_fit(alignedSize)) != NULL) {
@@ -198,6 +197,11 @@ void *mm_malloc(size_t size)
     if((bp = extend_heap(extendSize/WSIZE)) == NULL) {
 	    return NULL;
     }
+
+    //Now we can place, since the heap is larger
+    place(bp, alignedSize);
+
+    return bp;
 }
 
 /*
@@ -298,6 +302,7 @@ static void remove_from_free(void* bp) {
     else {
         free_end = HDRP(PREV_FREE(bp));
     }
+    
 }
 
 
