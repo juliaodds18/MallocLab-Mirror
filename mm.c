@@ -118,6 +118,7 @@ static void remove_from_free(void* bp);
 int mm_init(void)
 {
     // set the start and end pointers
+
     printf("INIT\n");
     if((heap_start = mem_sbrk(CHUNKSIZE + OVERHEAD)) == (void *)-1){
         return -1;
@@ -133,13 +134,15 @@ int mm_init(void)
     // initialize free list
     free_start = first_free;
     free_end = free_start;
-    //PUT(PREV_FREE(first_free), 0);
-    //PUT(NEXT_FREE(first_free), 0);
     
     printf("heap_start %p\n", heap_start);
     printf("first free: %p\n", first_free);
     PUT(heap_start, PACK(CHUNKSIZE, 1, 1, 0));
     PUT(FTRP(first_free), PACK(CHUNKSIZE, 1, 1, 0));
+   
+    // PUT(PREV_FREE(first_free), 0);
+    // PUT(NEXT_FREE(first_free), 0);
+
 
     PUT(free_start, 0);
     PUT(free_start, 0);
@@ -171,7 +174,7 @@ void *mm_malloc(size_t size)
 
     //Ignore empty requests
     if(size <= 0) {
-	return NULL;
+        return NULL;
     }
 
     //Adjust block size to include overhead and alignment
@@ -180,6 +183,7 @@ void *mm_malloc(size_t size)
 
     //Search free list for a fit. If it's there, place the block down. 
     if((bp = find_fit(alignedSize)) != NULL) {
+
 	printf("Fit found\n");
 	place(bp, alignedSize);
 	printf("Placing done\n");
@@ -191,7 +195,7 @@ void *mm_malloc(size_t size)
 
     //No fit found, get more memory by extending heap and place the block.
     if((bp = extend_heap(extendSize/WSIZE)) == NULL) {
-	return NULL;
+	    return NULL;
     }
 
     //Now we can place, since the heap is larger
@@ -237,7 +241,7 @@ static void *find_fit(size_t size) {
 
 
     //Traverse the free list. Not sure about the middle condition?? 
-    for (bp = free_start; GET_ALLOC(HDRP(bp)) == 0; bp = NEXT_FREE(bp)) {
+    for (bp = free_start; NEXT_FREE(bp) != 0; bp = NEXT_FREE(bp)) {
 
 	//If our size is smaller than the size of the block, return that block
 	if (size <= ((size_t)GET_SIZE(HDRP(bp))/* + OVERHEAD*/)) {
@@ -255,11 +259,11 @@ static void place(void* bp, size_t size) {
 
     //Free block is larger than the space needed
     if((blockSize - size) >= (OVERHEAD + DSIZE)) {
-	PUT(HDRP(bp), PACK(size, 1, 0, 1));  //Prev block alloc, next block free, current block alloc
-	PUT(FTRP(bp), PACK(size, 1, 0, 1));
+        PUT(HDRP(bp), PACK(size, 1, 0, 1));  //Prev block alloc, next block free, current block alloc
+        PUT(FTRP(bp), PACK(size, 1, 0, 1));
 	
 	//Remove the current block from free list
-	remove_from_free(bp);
+	    remove_from_free(bp);
 
 	//Fetch the next block to resize
 	bp = NEXT_BLKP(bp);
@@ -269,14 +273,13 @@ static void place(void* bp, size_t size) {
 	printf("New block size aligned: %d\n", ALIGN(blockSize - size));
 	PUT(HDRP(bp), PACK(blockSize - size, 1, 1, 0)); //Prev block alloc, next block alloc, current block free
 	PUT(FTRP(bp), PACK(blockSize - size, 1, 1, 0));
-        printf("Hello yello\n");
-	//TODO: ADD IT TO FREE LIST, coalesce?  
+	//TODO: ADD IT TO FREE LIST, coalesce? 
     }
     //Block fits perfectly
     else {
-	PUT(HDRP(bp), PACK(size, 1, 1, 1)); 
-	PUT(FTRP(bp), PACK(size, 1, 1, 1));
-	remove_from_free(bp);
+	    PUT(HDRP(bp), PACK(size, 1, 1, 1)); 
+	    PUT(FTRP(bp), PACK(size, 1, 1, 1));
+	    remove_from_free(bp);
     }
 }
 
@@ -288,7 +291,8 @@ static void remove_from_free(void* bp) {
     }
     // If not, then it is the new start of the list
     else {
-	free_start = HDRP(NEXT_FREE(bp));
+        free_start = HDRP(NEXT_FREE(bp));
+        //PUT(NEXT_FREE(free_start), 0);
     }
 
     // If there is a next block, make it point to the header of the previous block
@@ -296,12 +300,13 @@ static void remove_from_free(void* bp) {
 	PREV_FREE(NEXT_FREE(bp)) = HDRP(PREV_FREE(bp));
     }
     else {
-	free_end = HDRP(PREV_FREE(bp));
+        free_end = HDRP(PREV_FREE(bp));
     }
     
 }
 
-static void *extend_heap(size_t words) {
-    void *bp;
+
+static void* extend_heap(size_t words) {
+    void* bp;
     return bp;
 }
