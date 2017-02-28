@@ -140,8 +140,8 @@ int mm_init(void)
     PUT(heap_start, PACK(CHUNKSIZE, 1, 1, 0));
     PUT(FTRP(first_free), PACK(CHUNKSIZE, 1, 1, 0));
    
-    // PUT(PREV_FREE(first_free), 0);
-    // PUT(NEXT_FREE(first_free), 0);
+    PUT(PREV_FREE(first_free), *heap_start);
+    PUT(NEXT_FREE(first_free), *heap_end);
 
 
     PUT(free_start, 0);
