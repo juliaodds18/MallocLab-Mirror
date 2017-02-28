@@ -66,7 +66,7 @@ team_t team = {
 
 #define WSIZE       4   // Word and header/footer size in bytes
 #define DSIZE       8   // Double word size in bytes
-#define OVERHEAD    16  // overhead of header and footer
+#define OVERHEAD    8  // overhead of header and footer
 #define CHUNKSIZE   (1<<12) // original size of heap and the smallest extension size
 
 /* Pack a size and allocated bit into a word */
@@ -113,13 +113,15 @@ static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 void newfree(void *bp);
 void removefree(void *bp);
+static void *find_fit(size_t size);
+static void place(void *bp, size_t asize);
 
 /*
  * mm_init - initialize the malloc package.
  */
 int mm_init(void)
 {
-    if((heap_start = mem_sbrk(6*WSIZE)) == (void *)-1){
+    if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1){
         return -1;
     }
 
@@ -146,15 +148,28 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    int newsize = ALIGN(size + SIZE_T_SIZE);
-    void *p = mem_sbrk(newsize);
-    if (p == (void *)-1) {
+    size_t asize;      /* adjusted block size */
+    size_t extendsize; /* amount to extend heap if no fit */
+    char *bp;
+
+    /* Ignore spurious requests */
+    if (size <= 0) {
         return NULL;
     }
-    else {
-        *(size_t *)p = size;
-        return (void *)((char *)p + SIZE_T_SIZE);
+
+    asize = ALIGN(size + SIZE_T_SIZE);
+    if(asize > largest){
+        extendsize = MAX(asize,CHUNKSIZE);
+        if ((bp = extend_heap(extendsize/WSIZE)) == (void *)-1) {
+            return NULL;
+        }
     }
+    // Double checking that we actually find a fit in the free list
+    else if((bp = find_fit(asize)) == NULL){
+        return NULL;
+    }
+    place(bp, asize);
+    return bp;
 }
 
 /*
@@ -192,6 +207,23 @@ void *mm_realloc(void *ptr, size_t size)
     return newptr;
 }
 
+static void *find_fit(size_t size) {
+
+    //Pointer to search through the free list
+    void *bp;
+
+    //Traverse the free list. Not sure about the middle condition??
+    for (bp = free_start; NEXT_FREE(bp) != NULL; bp = NEXT_FREE(bp)) {
+    //If our size is smaller than the size of the block, return that block
+        if (size <= ((size_t)GET_SIZE(HDRP(bp)) /* + OVERHEAD */)) {
+            return bp;
+        }
+    }
+
+    //No fit, need to extend... Somethings wrong with the largest global var
+    return NULL;
+}
+
 static void *extend_heap(size_t words)
 {
     char *bp;
@@ -214,6 +246,27 @@ static void *extend_heap(size_t words)
     /* Coalesce if the previous block was free */
     return coalesce(bp);
 
+}
+
+static void place(void *bp, size_t asize)
+{
+    size_t bsize = GET_SIZE(HDRP(bp));
+
+    // More room, split into new free block
+    if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
+        removefree(bp);
+        PUT(HDRP(bp), PACK(asize, 1));
+        PUT(FTRP(bp), PACK(asize, 1));
+        bp = NEXT_BLKP(bp);
+        PUT(HDRP(bp), PACK(bsize-asize, 0));
+        PUT(FTRP(bp), PACK(bsize-asize, 0));
+        newfree(bp);
+    }
+    else {
+        removefree(bp);
+        PUT(HDRP(bp), PACK(bsize, 1));
+        PUT(FTRP(bp), PACK(bsize, 1));
+    }
 }
 
 void newfree(void *bp)
