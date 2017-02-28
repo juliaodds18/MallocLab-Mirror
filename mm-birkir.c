@@ -98,6 +98,7 @@ team_t team = {
 // Global variables
 char *heap_start = 0x0;
 char *free_start = 0x0;
+size_t largest;
 char *heap_end = 0x0;
 char *free_end = 0x0;
 
@@ -125,8 +126,10 @@ int mm_init(void)
     PUT(heap_start, 0); // WSIZE Padding before we move the heap_start
     heap_start += DSIZE;
     PUT(HDRP(heap_start), PACK(OVERHEAD, 1));
-    PUT(NEXT_FREE(heap_start), 0); // Pointer to first free block
-    PUT(PREV_FREE(heap_start), 0); // Stores size of largest free block
+    free_start = NULL;
+    largest = 0;
+    // PUT(NEXT_FREE(heap_start), 0); // Pointer to first free block
+    // PUT(PREV_FREE(heap_start), 0); // Stores size of largest free block
     PUT(FTRP(heap_start), PACK(OVERHEAD, 1));
     PUT(HDRP(NEXT_BLKP(heap_start)), PACK(0, 1)); // epilogue (End)
 
@@ -210,21 +213,30 @@ static void *extend_heap(size_t words)
 void newfree(void *bp)
 {
     /* Get old first pointer on free list */
-    void *old_firstfree = NEXT_FREE(heap_start);
+    // void *old_firstfree = NEXT_FREE(heap_start);
+    void *old_freestart = free_start;
+
     /* newFree points to old first free */
-    NEXT_FREE(bp) = NEXT_FREE(heap_start);
+    // NEXT_FREE(bp) = NEXT_FREE(heap_start);
+    NEXT_FREE(bp) = old_freestart;
     // PUT(NEXT_FREE(bp), NEXT_FREE(heap_start));
+
     /* Previous free to new free block is 0 (end) */
-    PUT(PREV_FREE(bp), 0);
+    // PUT(PREV_FREE(bp), 0);
+    PREV_FREE(bp) = NULL;
+
     // Put largest free block size in Prolouge Header
-    PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
+    largest = MAX(largest, GET_SIZE(bp));
+    // PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
+
     /* Old first free previous free points to new free block */
-    if (old_firstfree != 0){
-        PREV_FREE(old_firstfree) = bp;
+    if (old_freestart != NULL){
+        PREV_FREE(old_freestart) = bp;
         // PUT(PREV_FREE(old_firstfree), bp);
     }
     /* Prolouge header points to new free block */
-    NEXT_FREE(heap_start) = bp;
+    free_start = bp;
+    // NEXT_FREE(heap_start) = bp;
     // PUT(NEXT_FREE(heap_start), bp);
 }
 
