@@ -111,6 +111,7 @@ void *mm_realloc(void *ptr, size_t size);
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
 void newfree(void *bp);
+void removefree(void *bp);
 
 /*
  * mm_init - initialize the malloc package.
@@ -202,8 +203,7 @@ static void *extend_heap(size_t words)
     newfree(bp);
 
     /* Coalesce if the previous block was free */
-    return bp;
-    // return coalesce(bp);
+    return coalesce(bp);
 
 }
 
@@ -237,11 +237,35 @@ static void *coalesce(void *bp)
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
 
-    if(prev_alloc && next_alloc) {            /* Case 1 */
+    if (prev_alloc && next_alloc) {            /* Case 1 */
         return bp;
     }
     else if (prev_alloc && !next_alloc){
-
-        NEXT_FREE(bp) = NEXT_FREE(NEXT_BLKP(bp));
+        removefree(NEXT_BLKP(bp));
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        PUT(HDRP(bp), PACK(size, 0));
+        PUT(FTRP(bp), PACK(size, 0));
     }
+    else if (!prev_alloc && next_alloc){
+        removefree(PREV_BLKP(bp));
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        PUT(FTRP(bp), PACK(size, 0));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+        NEXT_FREE(heap_start) = bp;
+    }
+    else {
+        removefree(NEXT_BLKP(bp));
+        removefree(PREV_BLKP(bp));
+        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
+        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
+        bp = PREV_BLKP(bp);
+        NEXT_FREE(heap_start) = bp;
+    }
+    return bp;
+}
+
+void removefree(void *bp){
+    NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
+    PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
 }
