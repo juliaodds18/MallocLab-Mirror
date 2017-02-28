@@ -285,3 +285,8 @@ static void remove_from_free(void* bp) {
     }
     
 }
+
+static void* extend_heap(size_t words) {
+    void* bp;
+    return bp;
+}
