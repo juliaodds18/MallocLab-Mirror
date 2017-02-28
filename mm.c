@@ -168,7 +168,8 @@ void *mm_malloc(size_t size)
     else if((bp = find_fit(asize)) == NULL){
         return NULL;
     }
-    place(bp, asize);
+    place(bp, asize); 
+    // TODO: update largest if needed, iterate though freelist to find largest
     return bp;
 }
 
