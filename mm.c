@@ -163,17 +163,17 @@ void *mm_malloc(size_t size)
     char* bp; 
 
     //Ignore empty requests
-    if(size == 0) {
-	return NULL;
+    if(size <= 0) {
+        return NULL;
     }
 
     //Adjust block size to include overhead and alignment
     alignedSize = MAX(ALIGN(size), (OVERHEAD + DSIZE));
 
     //Search free list for a fit. If it's there, place the block down. 
-    if((bp = find_fit(alignedSize))) {
-	place(bp, alignedSize);
-	return bp;
+    if((bp = find_fit(alignedSize)) != NULL) {
+	    place(bp, alignedSize);
+	    return bp;
     }       
 
     //Since there is no fit found, we need to extend the heap. Find size to extend for.
@@ -181,7 +181,7 @@ void *mm_malloc(size_t size)
 
     //No fit found, get more memory by extending heap and place the block.
     if((bp = extend_heap(extendSize/WSIZE)) == NULL) {
-	return NULL;
+	    return NULL;
     }
 
     //Now we can place, since the heap is larger
@@ -229,7 +229,7 @@ static void *find_fit(size_t size) {
     for (bp = free_start; NEXT_FREE(bp) != 0; bp = NEXT_FREE(bp)) {
 
 	//If our size is smaller than the size of the block, return that block
-	    if (size <= GET_SIZE(HDRP(bp))) {
+	    if (size <= GET_SIZE(HDRP(bp))+OVERHEAD) {
 	        return bp; 
 	    }
     }
