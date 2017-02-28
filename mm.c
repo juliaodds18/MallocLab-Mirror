@@ -157,37 +157,28 @@ void *mm_malloc(size_t size)
         *(size_t *)p = size;
         return (void *)((char *)p + SIZE_T_SIZE);
     }*/
-
-    size_t alignedSize; 
-    size_t extendSize; 
-    char* bp; 
-
+    printf("MALLOC, SIZE %d\n", size);
+ 
+    size_t alignedSize;
+    size_t extendSize;
+    char* bp;
+ 
     //Ignore empty requests
     if(size <= 0) {
         return NULL;
     }
-
+ 
     //Adjust block size to include overhead and alignment
     alignedSize = MAX(ALIGN(size), (OVERHEAD + DSIZE));
-
-    //Search free list for a fit. If it's there, place the block down. 
+    printf("Aligned size: %d\n", alignedSize);
+ 
+    //Search free list for a fit. If it's there, place the block down.
     if((bp = find_fit(alignedSize)) != NULL) {
-	    place(bp, alignedSize);
-	    return bp;
-    }       
-
-    //Since there is no fit found, we need to extend the heap. Find size to extend for.
-    extendSize = MAX(alignedSize, CHUNKSIZE);
-
-    //No fit found, get more memory by extending heap and place the block.
-    if((bp = extend_heap(extendSize/WSIZE)) == NULL) {
-	    return NULL;
+        printf("Fit found\n");
+        place(bp, alignedSize);
+        printf("Placing done\n");
+        return bp;
     }
-
-    //Now we can place, since the heap is larger
-    place(bp, alignedSize);
-
-    return bp;
 }
 
 /*
@@ -282,8 +273,7 @@ static void remove_from_free(void* bp) {
     }
     else {
 	    free_end = HDRP(PREV_FREE(bp));
-    }
-    
+    }   
 }
 
 static void* extend_heap(size_t words) {
