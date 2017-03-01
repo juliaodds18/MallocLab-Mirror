@@ -164,31 +164,34 @@ void *mm_malloc(size_t size)
     if (size <= 0) {
         return NULL;
     }
+
     // printfreelist();
 
     asize = ALIGN(size + SIZE_T_SIZE);
-    if((bp = find_fit(asize)) == NULL){
-        extendsize = MAX(asize,CHUNKSIZE);
-        // printf("EXTENDING, no fit found\n");
-        if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
-            return NULL;
-        }
-    }
-    // printf("Found fit in:\n");
-    // printblock(bp);
-    // printf("\n");
 
-    // asize = ALIGN(size + SIZE_T_SIZE);
-    // if(asize > largest){
+    // if((bp = find_fit(asize)) == NULL){
     //     extendsize = MAX(asize,CHUNKSIZE);
+    //     printf("EXTENDING, no fit found\n");
     //     if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
     //         return NULL;
     //     }
     // }
-    // // Double checking that we actually find a fit in the free list
-    // else if((bp = find_fit(asize)) == NULL){
-    //     return NULL;
-    // }
+
+    if(asize > largest){
+        extendsize = MAX(asize,CHUNKSIZE);
+        if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+            return NULL;
+        }
+    }
+    // Double checking that we actually find a fit in the free list
+    else if((bp = find_fit(asize)) == NULL){
+        printf("There's no fit, largest LIED!!!\n");
+        return NULL;
+    }
+
+    // printf("Found fit in:\n");
+    // printblock(bp);
+    // printf("\n");
 
     place(bp, asize);
     // TODO: update largest if needed, iterate through freelist
@@ -200,14 +203,14 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 {
-    // printf("mm_free() freeing Block: \n"); fflush(stdout); printblock(bp);
-    // printfreelist();
+    // printf("mm_free() freeing Block: %p\n", bp); fflush(stdout); printblock(bp);
     size_t size = GET_SIZE(HDRP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
 
     newfree(bp);
     coalesce(bp);
+    printfreelist();
 }
 
 /*
@@ -304,27 +307,22 @@ void newfree(void *bp)
     void *old_freestart = free_start;
 
     /* newFree points to old first free */
-    // NEXT_FREE(bp) = NEXT_FREE(heap_start);
     NEXT_FREE(bp) = old_freestart;
-    // PUT(NEXT_FREE(bp), NEXT_FREE(heap_start));
 
     /* Previous free to new free block is 0 (end) */
-    // PUT(PREV_FREE(bp), 0);
     PREV_FREE(bp) = NULL;
 
     // Put largest free block size in Prolouge Header
-    largest = MAX(largest, GET_SIZE(bp));
+    largest = MAX(largest, GET_SIZE(HDRP(bp)));
     // PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
 
     /* Old first free previous free points to new free block */
     if (old_freestart != NULL){
         PREV_FREE(old_freestart) = bp;
-        // PUT(PREV_FREE(old_firstfree), bp);
     }
     /* Prolouge header points to new free block */
     free_start = bp;
     // NEXT_FREE(heap_start) = bp;
-    // PUT(NEXT_FREE(heap_start), bp);
 }
 
 /*
@@ -406,8 +404,8 @@ static void updateLargest() {
     void *bp;
     largest = 0;
     for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
-        if (GET_SIZE(bp) > largest) {
-            largest = GET_SIZE(bp);
+        if (GET_SIZE(HDRP(bp)) > largest) {
+            largest = GET_SIZE(HDRP(bp));
         }
     }
 }
@@ -435,6 +433,7 @@ static void printblock(void *bp)
 static void printfreelist()
 {
     printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
+    printf("Largest Free: %d\n", largest);
     char *bp;
     for(bp = free_start; bp != NULL; bp = NEXT_FREE(bp)){
         printblock(bp);
