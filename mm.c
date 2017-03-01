@@ -115,6 +115,7 @@ void newfree(void *bp);
 void removefree(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
+static void updateLargest();
 
 /*
  * mm_init - initialize the malloc package.
@@ -126,7 +127,7 @@ int mm_init(void)
     }
 
     PUT(heap_start, 0); // WSIZE Padding before we move the heap_start
-    heap_start += r; // make room for prolog
+    heap_start += DSIZE; // make room for prolog
     PUT(HDRP(heap_start), PACK(OVERHEAD, 1));
     free_start = NULL;
     largest = 0;
@@ -378,6 +379,7 @@ void removefree(void *bp){
 }
 
 void updateLargest() {
+    void *bp;
     for (bp = free_start; NEXT_FREE(bp) != NULL; bp = NEXT_FREE(bp)) {
         if (GET_SIZE(bp) > largest) {
             largest = GET_SIZE(bp);
