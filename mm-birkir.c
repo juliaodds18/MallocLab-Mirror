@@ -429,7 +429,6 @@ static void printblock(void *bp)
            hsize, (halloc ? 'a' : 'f'),
            PREV_FREE(bp), NEXT_FREE(bp),
            fsize, (falloc ? 'a' : 'f'));
-    fflush(stdout);
 }
 
 static void printfreelist()
