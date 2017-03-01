@@ -123,7 +123,7 @@ static void printblock(void *bp);
  */
 int mm_init(void)
 {
-    if((heap_start = mem_sbrk(4*WSIZE)) == (void *)-1){
+    if((heap_start = mem_sbrk(6*WSIZE)) == (void *)-1){
         return -1;
     }
 
@@ -132,6 +132,8 @@ int mm_init(void)
     PUT(HDRP(heap_start), PACK(OVERHEAD, 1));
     free_start = NULL;
     largest = 0;
+    NEXT_FREE(heap_start) = NULL;
+    PREV_FREE(heap_start) = NULL;
     // PUT(NEXT_FREE(heap_start), 0); // Pointer to first free block
     // PUT(PREV_FREE(heap_start), 0); // Stores size of largest free block
     PUT(FTRP(heap_start), PACK(OVERHEAD, 1));
