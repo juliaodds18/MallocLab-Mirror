@@ -169,13 +169,14 @@ void *mm_malloc(size_t size)
     asize = ALIGN(size + SIZE_T_SIZE);
     if((bp = find_fit(asize)) == NULL){
         extendsize = MAX(asize,CHUNKSIZE);
+        printf("EXTENDING, no fit found\n");
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
-            printf("EXTENDING, no fit found\n");
             return NULL;
         }
     }
     printf("Found fit in:\n");
     printblock(bp);
+    printf("\n")
 
     // asize = ALIGN(size + SIZE_T_SIZE);
     // if(asize > largest){
