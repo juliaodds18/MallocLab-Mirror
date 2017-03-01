@@ -176,7 +176,7 @@ void *mm_malloc(size_t size)
     }
     printf("Found fit in:\n");
     printblock(bp);
-    printf("\n")
+    printf("\n");
 
     // asize = ALIGN(size + SIZE_T_SIZE);
     // if(asize > largest){
