@@ -164,18 +164,18 @@ void *mm_malloc(size_t size)
     if (size <= 0) {
         return NULL;
     }
+    printfreelist();
 
     asize = ALIGN(size + SIZE_T_SIZE);
     if((bp = find_fit(asize)) == NULL){
         extendsize = MAX(asize,CHUNKSIZE);
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+            printf("EXTENDING, no fit found\n");
             return NULL;
         }
     }
-    printfreelist();
     printf("Found fit in:\n");
     printblock(bp);
-    printf("\n"); fflush(stdout);
 
     // asize = ALIGN(size + SIZE_T_SIZE);
     // if(asize > largest){
@@ -433,11 +433,11 @@ static void printblock(void *bp)
 
 static void printfreelist()
 {
-    printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n\n");
+    printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
     char *bp;
     for(bp = free_start; bp != NULL; bp = NEXT_FREE(bp)){
         printblock(bp);
     }
-    printf("\n--- FINISHED PRINTING ENTIRE FREE LIST FGS ---\n\n");
+    printf("--- FINISHED PRINTING ENTIRE FREE LIST FGS ---\n\n");
     fflush(stdout);
 }
