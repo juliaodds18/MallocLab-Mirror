@@ -200,14 +200,14 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 {
-    printf("mm_free() freeing Block: \n"); fflush(stdout); printblock(bp);
-    printfreelist();
+    printf("mm_free() freeing Block: %p\n", bp); fflush(stdout); printblock(bp);
     size_t size = GET_SIZE(HDRP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
 
     newfree(bp);
     coalesce(bp);
+    printfreelist();
 }
 
 /*
@@ -304,12 +304,9 @@ void newfree(void *bp)
     void *old_freestart = free_start;
 
     /* newFree points to old first free */
-    // NEXT_FREE(bp) = NEXT_FREE(heap_start);
     NEXT_FREE(bp) = old_freestart;
-    // PUT(NEXT_FREE(bp), NEXT_FREE(heap_start));
 
     /* Previous free to new free block is 0 (end) */
-    // PUT(PREV_FREE(bp), 0);
     PREV_FREE(bp) = NULL;
 
     // Put largest free block size in Prolouge Header
@@ -319,12 +316,10 @@ void newfree(void *bp)
     /* Old first free previous free points to new free block */
     if (old_freestart != NULL){
         PREV_FREE(old_freestart) = bp;
-        // PUT(PREV_FREE(old_firstfree), bp);
     }
     /* Prolouge header points to new free block */
     free_start = bp;
     // NEXT_FREE(heap_start) = bp;
-    // PUT(NEXT_FREE(heap_start), bp);
 }
 
 /*
@@ -406,8 +401,8 @@ static void updateLargest() {
     void *bp;
     largest = 0;
     for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
-        if (GET_SIZE(bp) > largest) {
-            largest = GET_SIZE(bp);
+        if (GET_SIZE(HDRP(bp)) > largest) {
+            largest = GET_SIZE(HDRP(bp));
         }
     }
 }
