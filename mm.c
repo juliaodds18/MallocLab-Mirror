@@ -116,6 +116,7 @@ void removefree(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
 static void updateLargest();
+int mm_check(void);
 
 /*
  * mm_init - initialize the malloc package.
@@ -244,6 +245,7 @@ static void *extend_heap(size_t words)
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); /* new epilogue header */
 
     newfree(bp);
+    heap_end = mem_heap_hi();
 
     /* Coalesce if the previous block was free */
     return coalesce(bp);
@@ -355,6 +357,8 @@ void removefree(void *bp){
         largest = 0;
     }
 
+   // mm_check();
+
     if(PREV_FREE(bp) != NULL) {
         NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
     }
@@ -391,32 +395,32 @@ void updateLargest() {
 
 int mm_check(void)
 {
-    printf("Is every block in the free list actually free?\n");
+    printf("Is every block in the free list actually free?\n"); fflush(stdout);
     char* iter;
 
     for(iter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
         iter = HDRP(iter);
-        if(GET_ALLOC(iter) != 0x1) {
-            printf("Block at location %s is in free list but not free\n", iter);
+        if(GET_ALLOC(iter) == 0x1) {
+            printf("Block at location %p is in free list but not free\n", iter); fflush(stdout);
             exit(-1);  //Should I exit?
         }
     }
 
 
-    printf("Are there any contiguous free blocks that somehow escaped coalescing?\n");
+    printf("Are there any contiguous free blocks that somehow escaped coalescing?\n"); fflush(stdout);
 
     /* Going through free list, checking both previous and next blocks. If they are free, then they have ecaped coalescing.*/
 
     iter = free_start;
     while(iter != NULL) {
-        int isnextalloc = GET_NEXTFREE(iter);
-        int isprevalloc = GET_PREVFREE(iter);
+        int isnextalloc = GET_ALLOC(NEXT_BLKP(HDRP(iter)));
+        int isprevalloc = GET_ALLOC(PREV_BLKP(HDRP(iter)));
 
         if(!isnextalloc) {
-            printf("Both current block and next block are free. Escpaed coalescing.\n");
+            printf("Both current block and next block are free. Escpaed coalescing.\n"); fflush(stdout);
         }
         if(!isprevalloc) {
-            printf("Both current block and previous block are free. Escaped coalescing.\n");
+            printf("Both current block and previous block are free. Escaped coalescing.\n"); fflush(stdout);
         }
 
         iter = NEXT_FREE(iter);
@@ -424,23 +428,24 @@ int mm_check(void)
 
 
     /* For each free block, go through free list, see if there is a match. If not, there is a free block not in the free list.*/
-    printf("Is every free block actually in the free list? \n");
+    printf("Is every free block actually in the free list? \n"); fflush(stdout);
 
     iter = heap_start;
-    while (iter != NULL) {
-        int isalloc = GET_ALLOC(iter);
+    while (iter >= heap_end) {
+        int isalloc = GET_ALLOC(HDRP(iter));
 
         if(!isalloc) {
             int found = 0;
-            for(char* freeiter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
+            for(char* freeiter = free_start; freeiter != NULL; freeiter = NEXT_FREE(freeiter)) {
                 if(iter == freeiter) {
                     found = 1;
                     break;
                 }
             }
+        
 
             if(!found) {
-                printf("Block at location %s is free but not in the free list.", iter);
+                printf("Block at location %p is free but not in the free list. \n", iter); fflush(stdout);
             }
         }
         iter = NEXT_BLKP(iter);
@@ -448,16 +453,16 @@ int mm_check(void)
 
     /*Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap. */
 
-    printf("Do any allocd blocks overlap?\n");
+    printf("Do any allocd blocks overlap?\n"); fflush(stdout);
 
     iter = heap_start;
-    while (iter != NULL) {
-        int headersize = GET_SIZE(iter);
+    while (iter >= heap_end) {
+        int headersize = GET_SIZE(HDRP(iter));
         char* footer = FTRP(iter);
         int footersize = GET_SIZE(footer);
 
         if(headersize != footersize) {
-            printf("The header and footer do not have the same size. There has been an overlap.\n");
+            printf("The header and footer do not have the same size. There has been an overlap.\n"); fflush(stdout);
         }
 
         iter = NEXT_BLKP(iter);
@@ -465,24 +470,24 @@ int mm_check(void)
 
     /*Check if pointers in heap point to valid addresses. If they are less than heap_start or greater than heap_end, then they are invalid.*/
 
-    printf("Do pointers in heap point to valid addresses? \n");
+    printf("Do pointers in heap point to valid addresses? \n"); fflush(stdout);
 
     iter = free_start;
-    while(iter != NULL) {
+    while(iter >= heap_end) {
         char* next = NEXT_FREE(iter);
 
         if(next < heap_start || next > heap_end) {
-        printf("Pointer in blcok %s points out of bounds.", iter);
+        printf("Pointer in blcok %p points out of bounds.\n", iter); fflush(stdout);
         }
 	   iter = next;
     }
 
     iter = free_end;
-    while(iter != NULL) {
+    while(iter >= heap_end) {
         char* prev = PREV_FREE(iter);
 
         if(prev < heap_start || prev > heap_end) {
-            printf("Pointer in block %s points out of bounds.", iter);
+            printf("Pointer in block %p points out of bounds.\n", iter); fflush(stdout);
         }
         iter = prev;
     }
