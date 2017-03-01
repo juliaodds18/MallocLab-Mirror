@@ -150,7 +150,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    printf("mm_malloc() Allocationg size: %d", size); fflush(stdout);
+    printf("mm_malloc() Allocationg size: %d\n", size); fflush(stdout);
     size_t asize;      /* adjusted block size */
     size_t extendsize; /* amount to extend heap if no fit */
     char *bp;
