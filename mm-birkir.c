@@ -164,7 +164,6 @@ void *mm_malloc(size_t size)
     if (size <= 0) {
         return NULL;
     }
-    printf("Largest Free: %d\n", largest);
     printfreelist();
 
     asize = ALIGN(size + SIZE_T_SIZE);
@@ -436,6 +435,7 @@ static void printblock(void *bp)
 static void printfreelist()
 {
     printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
+    printf("Largest Free: %d\n", largest);
     char *bp;
     for(bp = free_start; bp != NULL; bp = NEXT_FREE(bp)){
         printblock(bp);
