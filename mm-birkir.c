@@ -200,6 +200,7 @@ void *mm_malloc(size_t size)
 void mm_free(void *bp)
 {
     printf("mm_free() freeing Block: \n"); fflush(stdout); printblock(bp);
+    printfreelist();
     size_t size = GET_SIZE(HDRP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -334,16 +335,19 @@ static void *coalesce(void *bp)
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
 
-    if (prev_alloc && next_alloc) {            /* Case 1 */
+    // next and prev are both allocated, nothing to coalesce
+    if (prev_alloc && next_alloc) {         /* Case 1 */
         return bp;
     }
-    else if (prev_alloc && !next_alloc){
+    // next is free, remove/bypass it from freelist before coalescing
+    else if (prev_alloc && !next_alloc){    /* Case 2 */
         removefree(NEXT_BLKP(bp));
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
-    else if (!prev_alloc && next_alloc){
+    // previous is free, remove/bypass it from freelist before coalescing
+    else if (!prev_alloc && next_alloc){    /* Case 3 */
         removefree(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         NEXT_FREE(PREV_BLKP(bp)) = NEXT_FREE(bp);
@@ -351,10 +355,14 @@ static void *coalesce(void *bp)
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+        if(NEXT_FREE(bp) != NULL){
+            PREV_FREE(NEXT_FREE(bp)) = bp;
+        }
         // NEXT_FREE(heap_start) = bp;
         free_start = bp;
     }
-    else {
+    // both next and prev are free, remove/bypass both from freelist before coalescing
+    else {                                  /* Case 4 */
         removefree(NEXT_BLKP(bp));
         removefree(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
@@ -364,6 +372,9 @@ static void *coalesce(void *bp)
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+        if(NEXT_FREE(bp) != NULL){
+            PREV_FREE(NEXT_FREE(bp)) = bp;
+        }
         // NEXT_FREE(heap_start) = bp;
         free_start = bp;
     }
@@ -414,7 +425,7 @@ static void printblock(void *bp)
         return;
     }
 
-    printf("%p: header: [%d:%c] prev_free[%p] next_free[%p] footer: [%d:%c]\n\n", bp,
+    printf("%p: header: [%d:%c] prev_free[%p] next_free[%p] footer: [%d:%c]\n", bp,
            hsize, (halloc ? 'a' : 'f'),
            PREV_FREE(bp), NEXT_FREE(bp),
            fsize, (falloc ? 'a' : 'f'));
