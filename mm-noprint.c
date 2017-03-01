@@ -210,7 +210,8 @@ void mm_free(void *bp)
 
     newfree(bp);
     coalesce(bp);
-    printfreelist();
+
+    // printfreelist();
 }
 
 /*
