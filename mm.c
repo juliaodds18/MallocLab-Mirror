@@ -305,6 +305,7 @@ void newfree(void *bp)
  * coalesce - boundary tag coalescing. Return ptr to coalesced block
  */
 static void *coalesce(void *bp)
+
 {
     size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
@@ -317,14 +318,14 @@ static void *coalesce(void *bp)
     // next is free, remove/bypass it from freelist before coalescing
     else if (prev_alloc && !next_alloc){
        // printf("in coalesce, next free\n"); fflush(stdout);
-        removefree(NEXT_BLKP(bp));
+        removefree(NEXT_BLKP(HDRP(bp)));
         size += GET_SIZE(HDRP(NEXT_BLKP(HDRP(bp))));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
     // previous is free, remove/bypass it from freelist before coalescing
     else if (!prev_alloc && next_alloc){
-        removefree(PREV_BLKP(bp));
+        removefree(PREV_BLKP(HDRP(bp)));
         size += GET_SIZE(HDRP(PREV_BLKP(HDRP(bp))));
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(HDRP(bp))), PACK(size, 0));
@@ -386,3 +387,105 @@ void updateLargest() {
         }
     }
 }
+
+
+int mm_check(void)
+{
+    printf("Is every block in the free list actually free?\n");
+    char* iter;
+
+    for(iter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
+        iter = HDRP(iter);
+        if(GET_ALLOC(iter) != 0x1) {
+            printf("Block at location %s is in free list but not free\n", iter);
+            exit(-1);  //Should I exit?
+        }
+    }
+
+
+    printf("Are there any contiguous free blocks that somehow escaped coalescing?\n");
+
+    /* Going through free list, checking both previous and next blocks. If they are free, then they have ecaped coalescing.*/
+
+    iter = free_start;
+    while(iter != NULL) {
+        int isnextalloc = GET_NEXTFREE(iter);
+        int isprevalloc = GET_PREVFREE(iter);
+
+        if(!isnextalloc) {
+            printf("Both current block and next block are free. Escpaed coalescing.\n");
+        }
+        if(!isprevalloc) {
+            printf("Both current block and previous block are free. Escaped coalescing.\n");
+        }
+
+        iter = NEXT_FREE(iter);
+    }
+
+
+    /* For each free block, go through free list, see if there is a match. If not, there is a free block not in the free list.*/
+    printf("Is every free block actually in the free list? \n");
+
+    iter = heap_start;
+    while (iter != NULL) {
+        int isalloc = GET_ALLOC(iter);
+
+        if(!isalloc) {
+            int found = 0;
+            for(char* freeiter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
+                if(iter == freeiter) {
+                    found = 1;
+                    break;
+                }
+            }
+
+            if(!found) {
+                printf("Block at location %s is free but not in the free list.", iter);
+            }
+        }
+        iter = NEXT_BLKP(iter);
+    }
+
+    /*Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap. */
+
+    printf("Do any allocd blocks overlap?\n");
+
+    iter = heap_start;
+    while (iter != NULL) {
+        int headersize = GET_SIZE(iter);
+        char* footer = FTRP(iter);
+        int footersize = GET_SIZE(footer);
+
+        if(headersize != footersize) {
+            printf("The header and footer do not have the same size. There has been an overlap.\n");
+        }
+
+        iter = NEXT_BLKP(iter);
+    }
+
+    /*Check if pointers in heap point to valid addresses. If they are less than heap_start or greater than heap_end, then they are invalid.*/
+
+    printf("Do pointers in heap point to valid addresses? \n");
+
+    iter = free_start;
+    while(iter != NULL) {
+        char* next = NEXT_FREE(iter);
+
+        if(next < heap_start || next > heap_end) {
+        printf("Pointer in blcok %s points out of bounds.", iter);
+        }
+	   iter = next;
+    }
+
+    iter = free_end;
+    while(iter != NULL) {
+        char* prev = PREV_FREE(iter);
+
+        if(prev < heap_start || prev > heap_end) {
+            printf("Pointer in block %s points out of bounds.", iter);
+        }
+        iter = prev;
+    }
+    return 0;
+}
+
