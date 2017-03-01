@@ -117,6 +117,7 @@ static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
 static void updateLargest();
 static void printblock(void *bp);
+static void printfreelist();
 
 /*
  * mm_init - initialize the malloc package.
@@ -171,6 +172,10 @@ void *mm_malloc(size_t size)
             return NULL;
         }
     }
+    printfreelist();
+    printf("Found fit in:\n");
+    printblock(bp);
+    printf("\n"); fflush(stdout);
 
     // asize = ALIGN(size + SIZE_T_SIZE);
     // if(asize > largest){
@@ -413,5 +418,16 @@ static void printblock(void *bp)
            hsize, (halloc ? 'a' : 'f'),
            PREV_FREE(bp), NEXT_FREE(bp),
            fsize, (falloc ? 'a' : 'f'));
+    fflush(stdout);
+}
+
+static void printfreelist()
+{
+    printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n\n");
+    char *bp;
+    for(bp = free_start; bp != NULL; bp = NEXT_FREE(bp)){
+        printblock(bp);
+    }
+    printf("\n--- FINISHED PRINTING ENTIRE FREE LIST FGS ---\n\n");
     fflush(stdout);
 }
