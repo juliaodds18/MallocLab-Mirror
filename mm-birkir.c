@@ -269,6 +269,9 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(bsize, 1));
         PUT(FTRP(bp), PACK(bsize, 1));
     }
+    if(bsize >= largest){
+        updateLargest();
+    }
 }
 
 void newfree(void *bp)
@@ -331,13 +334,10 @@ static void *coalesce(void *bp)
         free_start = bp;
     }
     else {
-        if(GET_SIZE(HDRP(NEXT_BLKP(bp))) >= largest || GET_SIZE(HDRP(PREV_BLKP(bp))) >= largest) {
-            largest = 0;
-        }
         removefree(NEXT_BLKP(bp));
         removefree(PREV_BLKP(bp));
-        size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
-            GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         NEXT_FREE(PREV_BLKP(bp)) = NEXT_FREE(bp);
         PREV_FREE(PREV_BLKP(bp)) = NULL;
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
@@ -345,8 +345,8 @@ static void *coalesce(void *bp)
         bp = PREV_BLKP(bp);
         // NEXT_FREE(heap_start) = bp;
         free_start = bp;
-        updateLargest();
     }
+    largest = MAX(largest, size);
     return bp;
 }
 
@@ -371,6 +371,7 @@ void removefree(void *bp){
 
 static void updateLargest() {
     void *bp;
+    largest = 0;
     for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
         if (GET_SIZE(bp) > largest) {
             largest = GET_SIZE(bp);
