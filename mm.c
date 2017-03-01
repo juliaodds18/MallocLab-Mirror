@@ -126,7 +126,7 @@ int mm_init(void)
     }
 
     PUT(heap_start, 0); // WSIZE Padding before we move the heap_start
-    heap_start += DSIZE;
+    heap_start += DSIZE; // make room for prolog
     PUT(HDRP(heap_start), PACK(OVERHEAD, 1));
     free_start = NULL;
     largest = 0;
@@ -328,7 +328,7 @@ static void *coalesce(void *bp)
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
-        free_start = bp;
+        free_start = bp; // new head of free list
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
     else {
@@ -349,12 +349,23 @@ void removefree(void *bp){
         free_start = NEXT_FREE(bp);
     }
     */
+
     if(PREV_FREE(bp) != NULL) {
         NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
     }
+    // if PREV_FREE(bp) is NULL we need to update free_start
+    else {
+        free_start = NEXT_FREE(bp);
+    }
+
     //printf("after next free...\n"); fflush(stdout);
     if(NEXT_FREE(bp) != NULL) {
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
     }
+    else {
+        free_end = PREV_FREE(bp);
+    }
+    // if NEXT_FREE(bp) is null we need to update free_end
+
     //printf(" end of removefree \n"); fflush(stdout);
 }
