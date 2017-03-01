@@ -317,26 +317,26 @@ static void *coalesce(void *bp)
     else if (prev_alloc && !next_alloc){
        // printf("in coalesce, next free\n"); fflush(stdout);
         removefree(NEXT_BLKP(bp));
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        size += GET_SIZE(HDRP(NEXT_BLKP(HDRP(bp))));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
     // previous is free, remove/bypass it from freelist before coalescing
     else if (!prev_alloc && next_alloc){
         removefree(PREV_BLKP(bp));
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        size += GET_SIZE(HDRP(PREV_BLKP(HDRP(bp))));
         PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
+        PUT(HDRP(PREV_BLKP(HDRP(bp))), PACK(size, 0));
+        bp = PREV_BLKP(HDRP(bp));
         free_start = bp; // new head of free list
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
     else {
-        removefree(NEXT_BLKP(bp));
-        removefree(PREV_BLKP(bp));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
+        removefree(NEXT_BLKP(HDRP(bp)));
+        removefree(PREV_BLKP(HDRP(bp)));
+        PUT(HDRP(PREV_BLKP(HDRP(bp))), PACK(size, 0));
+        PUT(FTRP(NEXT_BLKP(HDRP(bp))), PACK(size, 0));
+        bp = PREV_BLKP(HDRP(bp));
         free_start = bp;
     }
     return bp;
