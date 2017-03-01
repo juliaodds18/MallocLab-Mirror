@@ -164,6 +164,7 @@ void *mm_malloc(size_t size)
     if (size <= 0) {
         return NULL;
     }
+    printf("Largest Free: %d\n", largest);
     printfreelist();
 
     asize = ALIGN(size + SIZE_T_SIZE);
