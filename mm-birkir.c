@@ -215,7 +215,7 @@ static void *find_fit(size_t size) {
     void *bp;
 
     //Traverse the free list. Not sure about the middle condition??
-    for (bp = free_start; NEXT_FREE(bp) != NULL; bp = NEXT_FREE(bp)) {
+    for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
     //If our size is smaller than the size of the block, return that block
         if (size <= ((size_t)GET_SIZE(HDRP(bp)) /* + OVERHEAD */)) {
             return bp;
@@ -371,7 +371,7 @@ void removefree(void *bp){
 
 static void updateLargest() {
     void *bp;
-    for (bp = free_start; NEXT_FREE(bp) != NULL; bp = NEXT_FREE(bp)) {
+    for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
         if (GET_SIZE(bp) > largest) {
             largest = GET_SIZE(bp);
         }
