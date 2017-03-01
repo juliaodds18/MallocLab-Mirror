@@ -115,6 +115,7 @@ void newfree(void *bp);
 void removefree(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
+static void updateLargest();
 
 /*
  * mm_init - initialize the malloc package.
@@ -169,6 +170,7 @@ void *mm_malloc(size_t size)
         return NULL;
     }
     place(bp, asize);
+    // TODO: update largest if needed, iterate through freelist
     return bp;
 }
 
@@ -323,20 +325,51 @@ static void *coalesce(void *bp)
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
-        NEXT_FREE(heap_start) = bp;
+        // NEXT_FREE(heap_start) = bp;
+        free_start = bp;
     }
     else {
+        if(GET_SIZE(HDRP(NEXT_BLKP(bp))) >= largest || GET_SIZE(HDRP(PREV_BLKP(bp))) >= largest) {
+            largest = 0;
+        }
         removefree(NEXT_BLKP(bp));
         removefree(PREV_BLKP(bp));
+        size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
+            GET_SIZE(FTRP(NEXT_BLKP(bp)));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
-        NEXT_FREE(heap_start) = bp;
+        // NEXT_FREE(heap_start) = bp;
+        free_start = bp;
+        updateLargest();
     }
     return bp;
 }
 
 void removefree(void *bp){
-    NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
-    PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
+    // if(free_start == bp){
+    //     free_start = NEXT_FREE(bp);
+    // }
+    if(PREV_FREE(bp) != NULL){
+        NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
+    }
+    else {
+        free_start = NEXT_FREE(bp);
+    }
+    if(NEXT_FREE(bp) != NULL){
+        PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
+    }
+
+    // SET values in block to NULL that we are removing (might be unneccessary)
+    PREV_FREE(bp) = NULL;
+    NEXT_FREE(bp) = NULL;
+}
+
+static void updateLargest() {
+    void *bp;
+    for (bp = free_start; NEXT_FREE(bp) != NULL; bp = NEXT_FREE(bp)) {
+        if (GET_SIZE(bp) > largest) {
+            largest = GET_SIZE(bp);
+        }
+    }
 }
