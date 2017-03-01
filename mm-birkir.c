@@ -164,31 +164,34 @@ void *mm_malloc(size_t size)
     if (size <= 0) {
         return NULL;
     }
+
     printfreelist();
 
     asize = ALIGN(size + SIZE_T_SIZE);
-    if((bp = find_fit(asize)) == NULL){
-        extendsize = MAX(asize,CHUNKSIZE);
-        printf("EXTENDING, no fit found\n");
-        if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
-            return NULL;
-        }
-    }
-    printf("Found fit in:\n");
-    printblock(bp);
-    printf("\n");
 
-    // asize = ALIGN(size + SIZE_T_SIZE);
-    // if(asize > largest){
+    // if((bp = find_fit(asize)) == NULL){
     //     extendsize = MAX(asize,CHUNKSIZE);
+    //     printf("EXTENDING, no fit found\n");
     //     if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
     //         return NULL;
     //     }
     // }
-    // // Double checking that we actually find a fit in the free list
-    // else if((bp = find_fit(asize)) == NULL){
-    //     return NULL;
-    // }
+
+    if(asize > largest){
+        extendsize = MAX(asize,CHUNKSIZE);
+        if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+            return NULL;
+        }
+    }
+    // Double checking that we actually find a fit in the free list
+    else if((bp = find_fit(asize)) == NULL){
+        printf("There's no fit, largest LIED!!!\n");
+        return NULL;
+    }
+
+    printf("Found fit in:\n");
+    printblock(bp);
+    printf("\n");
 
     place(bp, asize);
     // TODO: update largest if needed, iterate through freelist
