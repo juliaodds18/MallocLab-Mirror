@@ -141,6 +141,8 @@ int mm_init(void)
     if(extend_heap(CHUNKSIZE/WSIZE) == NULL){
         return -1;
     }
+    printf("\n\nNEW LIST\nPrologue: ");
+    printblock(heap_start);
     return 0;
 }
 
@@ -190,7 +192,7 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 {
-    printf("mm_free() freeing Block:\n"); fflush(stdout); printblock(bp);
+    printf("mm_free() freeing Block: \n"); fflush(stdout); printblock(bp);
     size_t size = GET_SIZE(HDRP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
