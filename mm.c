@@ -126,7 +126,7 @@ int mm_init(void)
     }
 
     PUT(heap_start, 0); // WSIZE Padding before we move the heap_start
-    heap_start += DSIZE; // make room for prolog
+    heap_start += r; // make room for prolog
     PUT(HDRP(heap_start), PACK(OVERHEAD, 1));
     free_start = NULL;
     largest = 0;
@@ -349,6 +349,9 @@ void removefree(void *bp){
         free_start = NEXT_FREE(bp);
     }
     */
+    if(GET_SIZE(bp) >= largest) {
+        largest = 0;
+    }
 
     if(PREV_FREE(bp) != NULL) {
         NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
@@ -365,7 +368,19 @@ void removefree(void *bp){
     else {
         free_end = PREV_FREE(bp);
     }
+
+    if (largest == 0) {
+        updateLargest();
+    }
     // if NEXT_FREE(bp) is null we need to update free_end
 
     //printf(" end of removefree \n"); fflush(stdout);
+}
+
+void updateLargest() {
+    for (bp = free_start; NEXT_FREE(bp) != NULL; bp = NEXT_FREE(bp)) {
+        if (GET_SIZE(bp) > largest) {
+            largest = GET_SIZE(bp);
+        }
+    }
 }
