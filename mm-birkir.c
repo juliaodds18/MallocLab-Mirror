@@ -129,14 +129,14 @@ int mm_init(void)
 
     PUT(heap_start, 0); // WSIZE Padding before we move the heap_start
     heap_start += DSIZE;
-    PUT(HDRP(heap_start), PACK(OVERHEAD, 1));
+    PUT(HDRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     free_start = NULL;
     largest = 0;
     NEXT_FREE(heap_start) = NULL;
     PREV_FREE(heap_start) = NULL;
     // PUT(NEXT_FREE(heap_start), 0); // Pointer to first free block
     // PUT(PREV_FREE(heap_start), 0); // Stores size of largest free block
-    PUT(FTRP(heap_start), PACK(OVERHEAD, 1));
+    PUT(FTRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     PUT(HDRP(NEXT_BLKP(heap_start)), PACK(0, 1)); // epilogue (End)
 
     /* EXTEND */
