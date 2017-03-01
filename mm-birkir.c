@@ -116,6 +116,7 @@ void removefree(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
 static void updateLargest();
+static void printblock(void *bp);
 
 /*
  * mm_init - initialize the malloc package.
@@ -149,6 +150,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
+    printf("mm_malloc() Allocationg size: %d", size); fflush(stdout);
     size_t asize;      /* adjusted block size */
     size_t extendsize; /* amount to extend heap if no fit */
     char *bp;
@@ -159,16 +161,25 @@ void *mm_malloc(size_t size)
     }
 
     asize = ALIGN(size + SIZE_T_SIZE);
-    if(asize > largest){
+    if((bp = find_fit(asize)) == NULL){
         extendsize = MAX(asize,CHUNKSIZE);
-        if ((bp = extend_heap(extendsize/WSIZE)) == (void *)-1) {
+        if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
             return NULL;
         }
     }
-    // Double checking that we actually find a fit in the free list
-    else if((bp = find_fit(asize)) == NULL){
-        return NULL;
-    }
+
+    // asize = ALIGN(size + SIZE_T_SIZE);
+    // if(asize > largest){
+    //     extendsize = MAX(asize,CHUNKSIZE);
+    //     if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+    //         return NULL;
+    //     }
+    // }
+    // // Double checking that we actually find a fit in the free list
+    // else if((bp = find_fit(asize)) == NULL){
+    //     return NULL;
+    // }
+
     place(bp, asize);
     // TODO: update largest if needed, iterate through freelist
     return bp;
@@ -179,6 +190,7 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 {
+    printf("mm_free() freeing Block:\n"); fflush(stdout); printblock(bp);
     size_t size = GET_SIZE(HDRP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
@@ -377,4 +389,24 @@ static void updateLargest() {
             largest = GET_SIZE(bp);
         }
     }
+}
+
+static void printblock(void *bp)
+{
+    size_t hsize, halloc, fsize, falloc;
+
+    hsize = GET_SIZE(HDRP(bp));
+    halloc = GET_ALLOC(HDRP(bp));
+    fsize = GET_SIZE(FTRP(bp));
+    falloc = GET_ALLOC(FTRP(bp));
+
+    if (hsize == 0) {
+        printf("%p: EOL\n", bp);
+        return;
+    }
+
+    printf("%p: header: [%d:%c] footer: [%d:%c]\n", bp,
+           hsize, (halloc ? 'a' : 'f'),
+           fsize, (falloc ? 'a' : 'f'));
+    fflush(stdout);
 }
