@@ -115,6 +115,7 @@ void newfree(void *bp);
 void removefree(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
+static void updateLargest();
 
 /*
  * mm_init - initialize the malloc package.
@@ -349,6 +350,9 @@ void removefree(void *bp){
         free_start = NEXT_FREE(bp);
     }
     */
+    if(GET_SIZE(bp) >= largest) {
+        largest = 0;
+    }
 
     if(PREV_FREE(bp) != NULL) {
         NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
@@ -365,7 +369,20 @@ void removefree(void *bp){
     else {
         free_end = PREV_FREE(bp);
     }
+
+    if (largest == 0) {
+        updateLargest();
+    }
     // if NEXT_FREE(bp) is null we need to update free_end
 
     //printf(" end of removefree \n"); fflush(stdout);
+}
+
+void updateLargest() {
+    void *bp;
+    for (bp = free_start; NEXT_FREE(bp) != NULL; bp = NEXT_FREE(bp)) {
+        if (GET_SIZE(bp) > largest) {
+            largest = GET_SIZE(bp);
+        }
+    }
 }
