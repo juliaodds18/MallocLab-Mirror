@@ -141,7 +141,7 @@ int mm_init(void)
     if(extend_heap(CHUNKSIZE/WSIZE) == NULL){
         return -1;
     }
-    printf("\n\nNEW LIST\nPrologue: ");
+    printf("\n\n\n\nNEW LIST\nPrologue: ");
     printblock(heap_start);
     return 0;
 }
@@ -407,8 +407,9 @@ static void printblock(void *bp)
         return;
     }
 
-    printf("%p: header: [%d:%c] footer: [%d:%c]\n", bp,
+    printf("%p: header: [%d:%c] prev_free[%p] next_free[%p] footer: [%d:%c]\n\n", bp,
            hsize, (halloc ? 'a' : 'f'),
+           PREV_FREE(bp), NEXT_FREE(bp),
            fsize, (falloc ? 'a' : 'f'));
     fflush(stdout);
 }
