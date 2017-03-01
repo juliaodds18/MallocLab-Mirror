@@ -322,6 +322,8 @@ static void *coalesce(void *bp)
     else if (!prev_alloc && next_alloc){
         removefree(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
+        NEXT_FREE(PREV_BLKP(bp)) = NEXT_FREE(bp);
+        PREV_FREE(PREV_BLKP(bp)) = PREV_FREE(bp);
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
@@ -336,6 +338,8 @@ static void *coalesce(void *bp)
         removefree(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp))) +
             GET_SIZE(FTRP(NEXT_BLKP(bp)));
+        NEXT_FREE(PREV_BLKP(bp)) = NEXT_FREE(bp);
+        PREV_FREE(PREV_BLKP(bp)) = PREV_FREE(bp);
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
