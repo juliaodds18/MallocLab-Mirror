@@ -310,7 +310,7 @@ void newfree(void *bp)
     PREV_FREE(bp) = NULL;
 
     // Put largest free block size in Prolouge Header
-    largest = MAX(largest, GET_SIZE(bp));
+    largest = MAX(largest, GET_SIZE(HDRP(bp)));
     // PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
 
     /* Old first free previous free points to new free block */
