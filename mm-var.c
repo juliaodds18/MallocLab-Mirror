@@ -418,10 +418,7 @@ static void place(void *bp, size_t asize)
 
 void newfree(void *bp)
 {
-    /* Get old first pointer on free list */
-    void *old_freestart = free_start;
-
-    /* newFree points to old first free */
+    /* newFree points to old free_start */
     NEXT_FREE(bp) = free_start;
 
     /* Previous free to new free block is 0 (end) */
@@ -480,12 +477,12 @@ static void *coalesce(void *bp)
         if(free_length <= 1){
             free_end = pbp;
         }
-        return pbp
+        return pbp;
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  /* Case 4 */
         pbp = PREV_BLKP(bp);
-        nbp = NEXT_BLKP(bp)
+        nbp = NEXT_BLKP(bp);
         removefree(nbp);
         removefree(pbp);
         size += GET_SIZE(HDRP(pbp));
@@ -502,7 +499,7 @@ static void *coalesce(void *bp)
         if(free_length <= 1){
             free_end = pbp;
         }
-        return pbp
+        return pbp;
     }
     // largest = MAX(largest, size);
     return bp;
