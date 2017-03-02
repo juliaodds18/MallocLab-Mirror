@@ -126,8 +126,6 @@ team_t team = {
 #define PREV_FREE(bp) (*(void **)((bp)))
 #define NEXT_FREE(bp) (*(void **)((bp) + WSIZE))
 
-#define BIGB (1<<11)
-
 // Global variables
 char *heap_start = 0x0;        // Points to the beginning of the heap
 char *heap_end = 0x0;          // Points to the end of the heap
@@ -209,7 +207,7 @@ void *mm_malloc(size_t size)
     asize = ALIGN(size + SIZE_T_SIZE);
     extendsize = MAX(asize,CHUNKSIZE);
 
-    if(asize >= BIGB && !bigblocks){
+    if(extendsize >= CHUNKSIZE && !bigblocks){
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
             return NULL;
         }
@@ -431,7 +429,7 @@ static void *extend_heap(size_t words)
 static void place(void *bp, size_t asize)
 {
     size_t bsize = GET_SIZE(HDRP(bp));
-    if(bsize >= BIGB){
+    if(bsize >= CHUNKSIZE){
         if (bigblocks){
             bigblocks--;
         }
@@ -446,7 +444,7 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(bsize-asize, 0));
         PUT(FTRP(bp), PACK(bsize-asize, 0));
         newfree(bp);
-        if((bsize-asize) >= BIGB){
+        if((bsize-asize) >= CHUNKSIZE){
             bigblocks++;
         }
     }
@@ -459,7 +457,7 @@ static void place(void *bp, size_t asize)
 
 void newfree(void *bp)
 {
-    if(GET_SIZE(HDRP(bp)) >= BIGB){
+    if(GET_SIZE(HDRP(bp)) >= CHUNKSIZE){
         bigblocks++;
     }
     /* newFree points to old free_start */
