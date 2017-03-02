@@ -480,6 +480,9 @@ static void *coalesce(void *bp)
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
         // NEXT_FREE(heap_start) = bp;
+        if(free_start == free_end){
+            free_end = bp;
+        }
         free_start = bp;
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
@@ -497,6 +500,9 @@ static void *coalesce(void *bp)
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
         // NEXT_FREE(heap_start) = bp;
+        if(free_start == free_end){
+            free_end = bp;
+        }
         free_start = bp;
     }
     largest = MAX(largest, size);
