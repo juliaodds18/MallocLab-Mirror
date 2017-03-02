@@ -126,6 +126,7 @@ team_t team = {
 #define PREV_FREE(bp) (*(void **)((bp)))
 #define NEXT_FREE(bp) (*(void **)((bp) + WSIZE))
 
+#define BIGB (1<<11)
 
 // Global variables
 char *heap_start = 0x0;        // Points to the beginning of the heap
@@ -133,6 +134,7 @@ char *heap_end = 0x0;          // Points to the end of the heap
 char *free_start = 0x0;        // Points to the beginning of the freelist
 char *free_end = 0x0;          // Points to the end of the freelist
 size_t free_length;            // Length of freelist
+size_t bigblocks;
 
 // Function declerations
 int mm_init(void);
@@ -177,6 +179,7 @@ int mm_init(void)
     NEXT_FREE(heap_start) = NULL;
     PREV_FREE(heap_start) = NULL;
 
+    bigblocks = 0;
 
     // Extend the heap
     if(extend_heap(CHUNKSIZE/WSIZE) == NULL){
@@ -205,11 +208,17 @@ void *mm_malloc(size_t size)
 
     asize = ALIGN(size + SIZE_T_SIZE);
 
-    if((bp = find_fit(asize)) == NULL){
-        extendsize = MAX(asize,CHUNKSIZE);
-
+    if(asize >= BIGB && !bigblocks){
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
             return NULL;
+        }
+    }
+    else {
+        if((bp = find_fit(asize)) == NULL){
+            extendsize = MAX(asize,CHUNKSIZE);
+            if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+                return NULL;
+            }
         }
     }
 
@@ -422,6 +431,11 @@ static void *extend_heap(size_t words)
 static void place(void *bp, size_t asize)
 {
     size_t bsize = GET_SIZE(HDRP(bp));
+    if(bsize >= BIGB){
+        if (bigblocks){
+            bigblocks--;
+        }
+    }
 
     // More room, split into new free block
     if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
@@ -432,6 +446,9 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(bsize-asize, 0));
         PUT(FTRP(bp), PACK(bsize-asize, 0));
         newfree(bp);
+        if((bsize-asize) >= BIGB){
+            bigblocks++;
+        }
     }
     else {
         removefree(bp);
@@ -442,6 +459,9 @@ static void place(void *bp, size_t asize)
 
 void newfree(void *bp)
 {
+    if(GET_SIZE(HDRP(bp)) >= BIGB){
+        bigblocks++;
+    }
     /* newFree points to old free_start */
     NEXT_FREE(bp) = free_start;
 
