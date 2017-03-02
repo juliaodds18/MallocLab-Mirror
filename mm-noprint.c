@@ -96,11 +96,12 @@ team_t team = {
 
 
 // Global variables
-char *heap_start = 0x0;
-char *free_start = 0x0;
-size_t largest;
-char *heap_end = 0x0;
-char *free_end = 0x0;
+char *heap_start = 0x0;        // points to the beginning of the heap
+char *heap_end = 0x0;          // points to the end of the heap
+size_t largest;                // size of the largest freeblock
+char *free_start = 0x0;        // points to the beginning of the freelist
+char *free_end = 0x0;          // points to the end of the freelist
+size_t free_length;            // length of freelist
 
 // Function declerations
 int mm_init(void);
@@ -132,11 +133,11 @@ int mm_init(void)
     heap_start += DSIZE;
     PUT(HDRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     free_start = NULL;
+    free_end = NULL;
     largest = 0;
+    free_length = 0;
     NEXT_FREE(heap_start) = NULL;
     PREV_FREE(heap_start) = NULL;
-    // PUT(NEXT_FREE(heap_start), 0); // Pointer to first free block
-    // PUT(PREV_FREE(heap_start), 0); // Stores size of largest free block
     PUT(FTRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     PUT(HDRP(NEXT_BLKP(heap_start)), PACK(0, 1)); // epilogue (End)
 
@@ -185,7 +186,7 @@ void *mm_malloc(size_t size)
     }
     // Double checking that we actually find a fit in the free list
     else if((bp = find_fit(asize)) == NULL){
-        printf("There's no fit, largest LIED!!!\n");
+        printf("There's no fit, largest LIED!!!\n"); fflush(stdout);
         return NULL;
     }
 
@@ -210,7 +211,6 @@ void mm_free(void *bp)
 
     newfree(bp);
     coalesce(bp);
-
     // printfreelist();
 }
 
@@ -219,37 +219,150 @@ void mm_free(void *bp)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    void *oldptr = ptr;
     void *newptr;
-    size_t copySize;
+    size_t alignedSize = ALIGN(size + SIZE_T_SIZE);
+    size_t currSize = GET_SIZE(HDRP(ptr));
+    if (size <= 0) {
+        printf("Size <= 0\n"); fflush(stdout);
+        mm_free(ptr);
+        return 0x0;
+    }
 
-    newptr = mm_malloc(size);
-    if (newptr == NULL) {
-        return NULL;
+    if (ptr == NULL) {
+    printf("ptr == null\n"); fflush(stdout);
+    return mm_malloc(size);
     }
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize) {
-        copySize = size;
+
+    if (alignedSize == currSize) {
+        //printf("alignedsize == currsize\n"); fflush(stdout);
+        return ptr;
     }
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
+
+
+    //If the aligned size, plus header and footer space, is smaller than current size, shrink the block
+    //This never happens in the test cases, but looks pretty
+    if (alignedSize + OVERHEAD < currSize) {
+        //Resize current block
+        PUT(HDRP(ptr), PACK(alignedSize, 1));
+        PUT(FTRP(ptr), PACK(alignedSize, 1));
+        //Create new free block
+        void *next = NEXT_BLKP(ptr);
+        PUT(HDRP(next), PACK(currSize - alignedSize, 0));
+        PUT(FTRP(next), PACK(currSize - alignedSize, 0));
+        newfree(next);
+        coalesce(next);
+        return ptr;
+    }
+
+    size_t prevSize = GET_SIZE(HDRP(PREV_BLKP(ptr)));
+/*
+    //If the previous block is free, move the memory over there and extend into the current block
+    if (GET_ALLOC(HDRP(PREV_BLKP(ptr))) == 0 && (currSize + prevSize > alignedSize + OVERHEAD)) {
+
+        //If prevsize + currsize is enough for our block, move the memory there and coalesce
+        if((prevSize + currSize) > alignedSize + OVERHEAD + 2*OVERHEAD) {
+        //Move the current block into the previous block
+            void* prev = PREV_BLKP(ptr);
+            removefree(prev);
+            //memcpy(prev, ptr, currSize);
+            //Since we don't want a new footer to override memory, we first need to alloc the entire space, then resize it after we memcpy
+            PUT(HDRP(prev), PACK(currSize + prevSize, 1));
+            PUT(FTRP(prev), PACK(currSize + prevSize, 1));
+            memcpy(prev, ptr, currSize);
+            PUT(HDRP(prev), PACK(alignedSize, 1));
+            PUT(FTRP(prev), PACK(alignedSize, 1));
+
+            //Create the new free block behind the one we just allocated
+            ptr = NEXT_BLKP(prev);
+            PUT(HDRP(ptr), PACK(currSize + prevSize - alignedSize, 0));
+            PUT(FTRP(ptr), PACK(currSize + prevSize - alignedSize, 0));
+            newfree(ptr);
+            coalesce(ptr);
+
+            return prev;
+
+        }
+
+    }*/
+
+    //If the previous block contains enough space for the alignedSize, move there
+/*    if(GET_ALLOC(HDRP(PREV_BLKP(ptr))) == 0 && (prevSize > alignedSize)) {
+
+        void* prev = PREV_BLKP(ptr);
+        removefree(prev);
+        PUT(HDRP(prev), PACK(currSize + prevSize, 1));
+        PUT(FTRP(prev), PACK(currSize + prevSize, 1));
+        memcpy(prev, ptr, currSize);
+        mm_free(ptr);
+        return prev;
+    }
+
+*/
+    size_t nextSize = GET_SIZE(HDRP(NEXT_BLKP(ptr)));
+
+    //If the next block is free, and there is enough space for the new size in the current block and next block combined, extend the block
+    if(GET_ALLOC(HDRP(NEXT_BLKP(ptr))) == 0 && (currSize + nextSize > alignedSize + OVERHEAD)) {
+
+        //If there is enough space to add another block behind our block, then extend current block
+        if ((nextSize + currSize) > (alignedSize + OVERHEAD + 2*OVERHEAD)) {
+            removefree(NEXT_BLKP(ptr));
+            PUT(HDRP(ptr), PACK(alignedSize, 1));
+            PUT(FTRP(ptr), PACK(alignedSize, 1));
+            void* next = NEXT_BLKP(ptr);
+            //Not sure if this is the correct size, check for overhead
+            PUT(HDRP(next), PACK(currSize + nextSize - alignedSize, 0));
+            PUT(HDRP(next), PACK(currSize + nextSize - alignedSize, 0));
+            newfree(next);
+            return ptr;
+        }
+        //If not, just take up the entire next block
+        else {
+            removefree(NEXT_BLKP(ptr));
+            PUT(HDRP(ptr), PACK(nextSize + currSize, 1));
+            PUT(HDRP(ptr), PACK(nextSize + currSize, 1));
+            return ptr;
+        }
+
+    }
+
+    newptr = mm_malloc(alignedSize);
+    memcpy(newptr, ptr, alignedSize);
+    mm_free(ptr);
+    ptr = NULL;
+
     return newptr;
 }
 
 static void *find_fit(size_t size) {
 
-    //Pointer to search through the free list
-    void *bp;
+    void *start = free_start;
+    void *end = free_end;
 
-    //Traverse the free list. Not sure about the middle condition??
-    for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
-    //If our size is smaller than the size of the block, return that block
-        if (size <= ((size_t)GET_SIZE(HDRP(bp)) /* + OVERHEAD */)) {
-            return bp;
+    /* if 0 or 1 Free block in free list */
+    if(start == end){
+        if(start == NULL){
+            return NULL;
         }
+        else if(size <= ((size_t)GET_SIZE(HDRP(start))))
+            return start;
     }
 
-    //No fit, need to extend... Somethings wrong with the largest global var
+    /* If 2 or more Free blocks in free list */
+    do{
+        if (size <= ((size_t)GET_SIZE(HDRP(start))))
+            return start;
+        if (size <= ((size_t)GET_SIZE(HDRP(end))))
+            return end;
+        start = NEXT_FREE(start);
+        if (start == end)
+            return NULL;
+        end = PREV_FREE(end);
+    }while(start != end);
+
+    /* Check needed if odd number of free blocks (middle block) */
+    if (size <= ((size_t)GET_SIZE(HDRP(start))))
+        return start;
+
     return NULL;
 }
 
@@ -305,10 +418,11 @@ void newfree(void *bp)
 {
     /* Get old first pointer on free list */
     // void *old_firstfree = NEXT_FREE(heap_start);
-    void *old_freestart = free_start;
+    // void *old_freestart = free_start;
 
     /* newFree points to old first free */
-    NEXT_FREE(bp) = old_freestart;
+    // NEXT_FREE(bp) = old_freestart;
+    NEXT_FREE(bp) = free_start;
 
     /* Previous free to new free block is 0 (end) */
     PREV_FREE(bp) = NULL;
@@ -318,12 +432,19 @@ void newfree(void *bp)
     // PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
 
     /* Old first free previous free points to new free block */
-    if (old_freestart != NULL){
-        PREV_FREE(old_freestart) = bp;
+    // if (old_freestart != NULL){
+    //     PREV_FREE(old_freestart) = bp;
+    // }
+    if (free_start != NULL){
+        PREV_FREE(free_start) = bp;
     }
     /* Prolouge header points to new free block */
     free_start = bp;
     // NEXT_FREE(heap_start) = bp;
+
+    if(free_end == NULL){
+        free_end = free_start;
+    }
 }
 
 /*
@@ -395,6 +516,9 @@ void removefree(void *bp){
     if(NEXT_FREE(bp) != NULL){
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
     }
+    if(bp == free_end){
+        free_end = PREV_FREE(bp);
+    }
 
     // SET values in block to NULL that we are removing (might be unneccessary)
     PREV_FREE(bp) = NULL;
@@ -435,6 +559,7 @@ static void printfreelist()
 {
     printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
     printf("Largest Free: %d\n", largest);
+    printf("free_start: %p free_end: %p\n", free_start, free_end);
     char *bp;
     for(bp = free_start; bp != NULL; bp = NEXT_FREE(bp)){
         printblock(bp);
