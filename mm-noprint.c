@@ -323,11 +323,11 @@ void newfree(void *bp)
 {
     /* Get old first pointer on free list */
     // void *old_firstfree = NEXT_FREE(heap_start);
-    // void *old_freestart = free_start;
+    void *old_freestart = free_start;
 
     /* newFree points to old first free */
     // NEXT_FREE(bp) = old_freestart;
-    NEXT_FREE(bp) = free_start;
+    NEXT_FREE(bp) = old_freestart;
 
     /* Previous free to new free block is 0 (end) */
     PREV_FREE(bp) = NULL;
@@ -340,14 +340,14 @@ void newfree(void *bp)
     // if (old_freestart != NULL){
     //     PREV_FREE(old_freestart) = bp;
     // }
-    if (free_start != NULL){
-        PREV_FREE(free_start) = bp;
+    if (old_freestart != NULL){
+        PREV_FREE(old_freestart) = bp;
     }
     /* Prolouge header points to new free block */
     free_start = bp;
     // NEXT_FREE(heap_start) = bp;
 
-    if(free_end == NULL){
+    if(free_length == 0){
         free_end = free_start;
     }
     free_length++;
@@ -386,10 +386,10 @@ static void *coalesce(void *bp)
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
         // NEXT_FREE(heap_start) = bp;
-        if(free_start == free_end){
+        free_start = bp;
+        if(free_length <= 1){
             free_end = bp;
         }
-        free_start = bp;
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  /* Case 4 */
@@ -406,10 +406,10 @@ static void *coalesce(void *bp)
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
         // NEXT_FREE(heap_start) = bp;
-        if(free_start == free_end){
+        free_start = bp;
+        if(free_length <= 1){
             free_end = bp;
         }
-        free_start = bp;
     }
     largest = MAX(largest, size);
     return bp;
@@ -428,7 +428,7 @@ void removefree(void *bp){
     if(NEXT_FREE(bp) != NULL){
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
     }
-    else {
+    if (bp == free_end) {
         free_end = PREV_FREE(bp);
     }
 
