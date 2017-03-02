@@ -358,15 +358,39 @@ void *mm_realloc(void *ptr, size_t size)
 static void *find_fit(size_t size) {
 
     //Pointer to search through the free list
-    void* bp;
+    void* start = free_start;
+    void* end = free_end;
+    int min = 0;
+    int max = free_length;
 
-    //Traverse the free list
-    for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
-    //If our size is smaller than the size of the block, return that block
-        if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
-            return bp;
+    // search for a fit from both ends of the freelist
+    while(min < max) {
+        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
+            return start;
         }
+        if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
+            return end;
+        }
+
+        min++;
+        max--;
+        start = NEXT_FREE(start);
+        end = PREV_FREE(end);
     }
+
+
+
+    // //Pointer to search through the free list
+    // void* bp;
+
+    // //Traverse the free list
+    // for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
+    // //If our size is smaller than the size of the block, return that block
+    //     if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
+    //         return bp;
+    //     }
+    // }
+
 
     return NULL;
 }
@@ -442,11 +466,11 @@ void newfree(void *bp)
  */
 static void *coalesce(void *bp)
 {
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+    void *nbp = NEXT_BLKP(bp);
+    void *pbp = PREV_BLKP(bp);
+    size_t prev_alloc = GET_ALLOC(FTRP(pbp));
+    size_t next_alloc = GET_ALLOC(HDRP(nbp));
     size_t size = GET_SIZE(HDRP(bp));
-    void *nbp;
-    void *pbp;
 
     // next and prev are both allocated, nothing to coalesce
     if (prev_alloc && next_alloc) {         /* Case 1 */
@@ -468,16 +492,15 @@ static void *coalesce(void *bp)
         NEXT_FREE(pbp) = NEXT_FREE(bp);
         PREV_FREE(pbp) = NULL;
         PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(pbp), PACK(size, 0));
-        if(NEXT_FREE(pbp) != NULL){
-            PREV_FREE(NEXT_FREE(pbp)) = pbp;
+        bp = pbp;
+        PUT(HDRP(bp), PACK(size, 0));
+        if(NEXT_FREE(bp) != NULL){
+            PREV_FREE(NEXT_FREE(bp)) = bp;
         }
-        // NEXT_FREE(heap_start) = bp;
-        free_start = pbp;
+        free_start = bp;
         if(free_length <= 1){
-            free_end = pbp;
+            free_end = bp;
         }
-        return pbp;
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  /* Case 4 */
@@ -491,15 +514,15 @@ static void *coalesce(void *bp)
         PREV_FREE(pbp) = NULL;
         PUT(HDRP(pbp), PACK(size, 0));
         PUT(FTRP(nbp), PACK(size, 0));
-        if(NEXT_FREE(pbp) != NULL){
-            PREV_FREE(NEXT_FREE(pbp)) = pbp;
+        bp = pbp;
+        if(NEXT_FREE(bp) != NULL){
+            PREV_FREE(NEXT_FREE(bp)) = bp;
         }
         // NEXT_FREE(heap_start) = bp;
-        free_start = pbp;
+        free_start = bp;
         if(free_length <= 1){
-            free_end = pbp;
+            free_end = bp;
         }
-        return pbp;
     }
     // largest = MAX(largest, size);
     return bp;
