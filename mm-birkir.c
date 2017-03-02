@@ -338,6 +338,11 @@ void *mm_realloc(void *ptr, size_t size)
 static void *find_fit(size_t size) {
 
     //Pointer to search through the free list
+    if(free_start == NULL){
+        next_fit = NULL;
+        return NULL;
+    }
+
     void* start = next_fit;
     void* end = PREV_FREE(next_fit);
 
@@ -347,8 +352,15 @@ static void *find_fit(size_t size) {
     }
 
     //Traverse the free list
-    while(start != end && start != NULL){
-        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
+    while(1){
+        if(start == end){
+            if (size <= ((size_t)GET_SIZE(HDRP(start)))){
+                ext_fit = NEXT_FREE(start);
+                return start;
+            }
+            break;
+        }
+        if (size <= ((size_t)GET_SIZE(HDRP(start)))){
             next_fit = NEXT_FREE(start);
             return start;
         }
