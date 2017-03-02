@@ -220,7 +220,8 @@ void *mm_realloc(void *ptr, size_t size)
     void *newptr;
     size_t asize = ALIGN(size + SIZE_T_SIZE);
     size_t currSize = GET_SIZE(HDRP(ptr));
-    void *nfree;
+    void *next;
+    void *prev;
 
     if (size <= 0) {
         printf("Size <= 0\n"); fflush(stdout);
@@ -251,10 +252,10 @@ void *mm_realloc(void *ptr, size_t size)
                 removefree(NEXT_BLKP(ptr));
                 PUT(HDRP(ptr), PACK(asize, 1));
                 PUT(FTRP(ptr), PACK(asize, 1));
-                nfree = NEXT_BLKP(ptr);
-                PUT(HDRP(nfree), PACK(bsize-asize, 0));
-                PUT(FTRP(nfree), PACK(bsize-asize, 0));
-                newfree(nfree);
+                next = NEXT_BLKP(ptr);
+                PUT(HDRP(next), PACK(bsize-asize, 0));
+                PUT(FTRP(next), PACK(bsize-asize, 0));
+                newfree(next);
                 return ptr;
             }
             else {
@@ -270,21 +271,52 @@ void *mm_realloc(void *ptr, size_t size)
         size_t bsize = currSize + prevSize;
         if(asize <= bsize){
             if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
-                void* prev = PREV_BLKP(ptr);
+                prev = PREV_BLKP(ptr);
                 removefree(prev);
                 PUT(HDRP(prev), PACK(asize, 1));
                 memcpy(prev, ptr, currSize);
                 PUT(FTRP(prev), PACK(asize, 1));
-                nfree = NEXT_BLKP(prev);
-                PUT(HDRP(nfree), PACK(bsize-asize, 0));
-                PUT(FTRP(nfree), PACK(bsize-asize, 0));
-                newfree(nfree);
-                coalesce(nfree);
+                next = NEXT_BLKP(prev);
+                PUT(HDRP(next), PACK(bsize-asize, 0));
+                PUT(FTRP(next), PACK(bsize-asize, 0));
+                newfree(next);
+                coalesce(next);
                 return prev;
             }
             else {
-                void* prev = PREV_BLKP(ptr);
+                prev = PREV_BLKP(ptr);
                 removefree(prev);
+                PUT(HDRP(prev), PACK(bsize, 1));
+                memcpy(prev, ptr, currSize);
+                PUT(FTRP(prev), PACK(bsize, 1));
+                return prev;
+            }
+        }
+    }
+
+    if(!GET_ALLOC(HDRP(PREV_BLKP(ptr))) &&
+       !GET_ALLOC(HDRP(NEXT_BLKP(ptr)))){
+        size_t bsize = prevSize + currSize + nextSize;
+        if(asize <= bsize){
+            if((bsize - asize) >= (DSIZE + OVERHEAD)){
+                prev = PREV_BLKP(ptr);
+                next = NEXT_BLKP(ptr);
+                removefree(prev);
+                removefree(next);
+                PUT(HDRP(prev), PACK(asize, 1));
+                memcpy(prev, ptr, currSize);
+                PUT(FTRP(prev), PACK(asize, 1));
+                next = NEXT_BLKP(prev);
+                PUT(HDRP(next), PACK(bsize-asize, 0));
+                PUT(FTRP(next), PACK(bsize-asize, 0));
+                newfree(next);
+                return prev;
+            }
+            else {
+                prev = PREV_BLKP(ptr);
+                next = NEXT_BLKP(ptr);
+                removefree(prev);
+                removefree(next);
                 PUT(HDRP(prev), PACK(bsize, 1));
                 memcpy(prev, ptr, currSize);
                 PUT(FTRP(prev), PACK(bsize, 1));
