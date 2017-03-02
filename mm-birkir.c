@@ -296,6 +296,7 @@ void *mm_realloc(void *ptr, size_t size)
 
     if(!GET_ALLOC(HDRP(PREV_BLKP(ptr))) &&
        !GET_ALLOC(HDRP(NEXT_BLKP(ptr)))){
+        printf("realloc both sides!\n");
         size_t bsize = prevSize + currSize + nextSize;
         if(asize <= bsize){
             if((bsize - asize) >= (DSIZE + OVERHEAD)){
