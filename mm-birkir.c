@@ -340,32 +340,32 @@ static void *find_fit(size_t size) {
 
     //Pointer to search through the free list
     void* start = free_start;
-    void* end = free_end;
-    int min = 0;
-    int max = free_length;
+    // void* end = free_end;
+    // int min = 0;
+    // int max = free_length;
 
     // search for a fit from both ends of the freelist
-    while(min < max) {
-        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
-            return start;
-        }
-        if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
-            return end;
-        }
+    // while(min < max) {
+    //     if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
+    //         return start;
+    //     }
+    //     if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
+    //         return end;
+    //     }
 
-        min++;
-        max--;
-        start = NEXT_FREE(start);
-        end = PREV_FREE(end);
-    }
+    //     min++;
+    //     max--;
+    //     start = NEXT_FREE(start);
+    //     end = PREV_FREE(end);
+    // }
 
     //Traverse the free list
-    /*for (start = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
+    for (start = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
     //If our size is smaller than the size of the block, return that block
         if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
             return bp;
         }
-    }*/
+    }
 
     //No fit, need to extend... Somethings wrong with the largest global var
     return NULL;
