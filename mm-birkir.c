@@ -270,6 +270,7 @@ void *mm_realloc(void *ptr, size_t size)
         size_t bsize = currSize + prevSize;
         if(asize <= bsize){
             if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
+                printf("realloc-left:1\n");
                 void* prev = PREV_BLKP(ptr);
                 removefree(prev);
                 PUT(HDRP(prev), PACK(asize, 1));
@@ -283,6 +284,7 @@ void *mm_realloc(void *ptr, size_t size)
                 return prev;
             }
             else {
+                printf("realloc-left:2\n");
                 void* prev = PREV_BLKP(ptr);
                 removefree(prev);
                 PUT(HDRP(prev), PACK(asize, 1));
