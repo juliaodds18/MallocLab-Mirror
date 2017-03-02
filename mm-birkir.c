@@ -559,6 +559,7 @@ static void printfreelist()
 {
     printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
     printf("Largest Free: %d\n", largest);
+    printf("free_start: %p free_end: %p\n", free_start, free_end);
     char *bp;
     for(bp = free_start; bp != NULL; bp = NEXT_FREE(bp)){
         printblock(bp);
