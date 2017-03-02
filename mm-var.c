@@ -207,6 +207,7 @@ void *mm_malloc(size_t size)
     }
 
     asize = ALIGN(size + SIZE_T_SIZE);
+    extendsize = MAX(asize,CHUNKSIZE);
 
     if(asize >= BIGB && !bigblocks){
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
@@ -215,7 +216,6 @@ void *mm_malloc(size_t size)
     }
     else {
         if((bp = find_fit(asize)) == NULL){
-            extendsize = MAX(asize,CHUNKSIZE);
             if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
                 return NULL;
             }
