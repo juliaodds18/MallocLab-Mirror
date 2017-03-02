@@ -355,7 +355,7 @@ static void *find_fit(size_t size) {
     while(1){
         if(start == end){
             if (size <= ((size_t)GET_SIZE(HDRP(start)))){
-                ext_fit = NEXT_FREE(start);
+                next_fit = NEXT_FREE(start);
                 return start;
             }
             break;
@@ -534,6 +534,9 @@ void removefree(void *bp){
     }
     if (bp == free_end) {
         free_end = PREV_FREE(bp);
+    }
+    if (bp == next_fit){
+        next_fit = NEXT_FREE(bp);
     }
 
     // SET values in block to NULL that we are removing (might be unneccessary)
