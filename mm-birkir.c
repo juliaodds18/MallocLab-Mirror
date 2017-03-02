@@ -134,7 +134,7 @@ int mm_init(void)
     PUT(HDRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     free_start = NULL;
     free_end = NULL;
-    largest = 0;
+    // largest = 0;
     free_length = 0;
     NEXT_FREE(heap_start) = NULL;
     PREV_FREE(heap_start) = NULL;
@@ -145,8 +145,8 @@ int mm_init(void)
     if(extend_heap(CHUNKSIZE/WSIZE) == NULL){
         return -1;
     }
-    printf("\n\n\n\nNEW LIST\nPrologue: ");
-    printblock(heap_start);
+    // printf("\n\n\n\nNEW LIST\nPrologue: ");
+    // printblock(heap_start);
     return 0;
 }
 
@@ -156,7 +156,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
-    printf("mm_malloc() Allocationg size: %d\n", size); fflush(stdout);
+    // printf("mm_malloc() Allocationg size: %d\n", size); fflush(stdout);
     size_t asize;      /* adjusted block size */
     size_t extendsize; /* amount to extend heap if no fit */
     char *bp;
@@ -166,36 +166,34 @@ void *mm_malloc(size_t size)
         return NULL;
     }
 
-    printfreelist();
+    // printfreelist();
 
     asize = ALIGN(size + SIZE_T_SIZE);
 
-    // if((bp = find_fit(asize)) == NULL){
-    //     extendsize = MAX(asize,CHUNKSIZE);
-    //     printf("EXTENDING, no fit found\n");
-    //     if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
-    //         return NULL;
-    //     }
-    // }
-
-    if(asize > largest){
+    if((bp = find_fit(asize)) == NULL){
         extendsize = MAX(asize,CHUNKSIZE);
+        // printf("EXTENDING, no fit found\n");
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
             return NULL;
         }
     }
-    // Double checking that we actually find a fit in the free list
-    else if((bp = find_fit(asize)) == NULL){
-        printf("There's no fit, largest LIED!!!\n"); fflush(stdout);
-        return NULL;
-    }
 
-    printf("Found fit in:\n");
-    printblock(bp);
-    printf("\n");
+    // printf("Found fit in:\n");
+    // printblock(bp);
+    // printf("\n");
+
+    // if(asize > largest){
+    //     extendsize = MAX(asize,CHUNKSIZE);
+    //     if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+    //         return NULL;
+    //     }
+    // }
+    // // Double checking that we actually find a fit in the free list
+    // else if((bp = find_fit(asize)) == NULL){
+    //     return NULL;
+    // }
 
     place(bp, asize);
-    // TODO: update largest if needed, iterate through freelist
     return bp;
 }
 
@@ -204,14 +202,14 @@ void *mm_malloc(size_t size)
  */
 void mm_free(void *bp)
 {
-    printf("mm_free() freeing Block: %p\n", bp); fflush(stdout); printblock(bp);
+    // printf("mm_free() freeing Block: \n"); fflush(stdout); printblock(bp);
     size_t size = GET_SIZE(HDRP(bp));
     PUT(HDRP(bp), PACK(size, 0));
     PUT(FTRP(bp), PACK(size, 0));
 
     newfree(bp);
     coalesce(bp);
-    printfreelist();
+    // printfreelist();
 }
 
 /*
@@ -219,53 +217,102 @@ void mm_free(void *bp)
  */
 void *mm_realloc(void *ptr, size_t size)
 {
-    void *oldptr = ptr;
     void *newptr;
-    size_t copySize;
+    size_t asize = ALIGN(size + SIZE_T_SIZE);
+    size_t currSize = GET_SIZE(HDRP(ptr));
+    void *newfree;
 
-    newptr = mm_malloc(size);
-    if (newptr == NULL) {
-        return NULL;
+    if (size <= 0) {
+        printf("Size <= 0\n"); fflush(stdout);
+        mm_free(ptr);
+        return 0x0;
     }
-    copySize = *(size_t *)((char *)oldptr - SIZE_T_SIZE);
-    if (size < copySize) {
-        copySize = size;
+
+    if (ptr == NULL) {
+        printf("ptr == null\n"); fflush(stdout);
+        return mm_malloc(size);
     }
-    memcpy(newptr, oldptr, copySize);
-    mm_free(oldptr);
+
+    if (asize == currSize) {
+        // printf("alignedsize == currsize\n"); fflush(stdout);
+        return ptr;
+    }
+
+    // What if asize is smaller than current size?
+
+    size_t prevSize = GET_SIZE(HDRP(PREV_BLKP(ptr)));
+    size_t nextSize = GET_SIZE(HDRP(NEXT_BLKP(ptr)));
+
+    //If the next block is free, and there is enough space for the new size in the current block and next block combined, extend the block
+    if(!GET_ALLOC(HDRP(NEXT_BLKP(ptr)))){
+        size_t bsize = currSize + nextSize;
+        if(asize <= bsize){
+            if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
+                removefree(NEXT_BLKP(ptr));
+                PUT(HDRP(ptr), PACK(asize, 1));
+                PUT(FTRP(ptr), PACK(asize, 1));
+                newfree = NEXT_BLKP(bp);
+                PUT(HDRP(newfree), PACK(bsize-asize, 0));
+                PUT(FTRP(newfree), PACK(bsize-asize, 0));
+                newfree(newfree);
+                return ptr;
+            }
+            else {
+                removefree(NEXT_BLKP(ptr));
+                PUT(HDRP(ptr), PACK(bsize, 1));
+                PUT(FTRP(ptr), PACK(bsize, 1));
+                return ptr;
+            }
+        }
+    }
+
+    if(!GET_ALLOC(HDRP(PREV_BLKP(ptr)))){
+        size_t bsize = currSize + prevSize;
+        if(asize <= bsize){
+
+        }
+    }
+
+    newptr = mm_malloc(asize);
+    // Not copying DSIZE becuase preserving new Footer and possibly Head of next block.
+    memcpy(newptr, ptr, (asize - OVERHEAD));
+    mm_free(ptr);
+
     return newptr;
 }
 
 static void *find_fit(size_t size) {
 
-    void *start = free_start;
-    void *end = free_end;
+    //Pointer to search through the free list
+    void* start = free_start;
+    void* end = free_end;
+    int min = 0;
+    int max = free_length;
 
-    /* if 0 or 1 Free block in free list */
-    if(start == end){
-        if(start == NULL){
-            return NULL;
-        }
-        else if(size <= ((size_t)GET_SIZE(HDRP(start))))
+    // search for a fit from both ends of the freelist
+    while(min < max) {
+        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
             return start;
+        }
+        if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
+            return end;
+        }
+
+        min++;
+        max--;
+        start = NEXT_FREE(start);
+        end = PREV_FREE(end);
     }
 
-    /* If 2 or more Free blocks in free list */
-    do{
-        if (size <= ((size_t)GET_SIZE(HDRP(start))))
-            return start;
-        if (size <= ((size_t)GET_SIZE(HDRP(end))))
-            return end;
-        start = NEXT_FREE(start);
-        if (start == end)
-            return NULL;
-        end = PREV_FREE(end);
-    }while(start != end);
+    //Traverse the free list
+    /*for (start = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
+    //If our size is smaller than the size of the block, return that block
+        if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
+            return bp;
+        }
+    }*/
 
-    /* Check needed if odd number of free blocks (middle block) */
-    if (size <= ((size_t)GET_SIZE(HDRP(start))))
-        return start;
-
+    //No fit, need to extend... Somethings wrong with the largest global var
     return NULL;
 }
 
@@ -312,42 +359,36 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(bsize, 1));
         PUT(FTRP(bp), PACK(bsize, 1));
     }
-    if(bsize >= largest){
-        updateLargest();
-    }
+    // if(bsize >= largest){
+    //     updateLargest();
+    // }
 }
 
 void newfree(void *bp)
 {
     /* Get old first pointer on free list */
-    // void *old_firstfree = NEXT_FREE(heap_start);
-    // void *old_freestart = free_start;
+    void *old_freestart = free_start;
 
     /* newFree points to old first free */
-    // NEXT_FREE(bp) = old_freestart;
-    NEXT_FREE(bp) = free_start;
+    NEXT_FREE(bp) = old_freestart;
 
     /* Previous free to new free block is 0 (end) */
     PREV_FREE(bp) = NULL;
 
     // Put largest free block size in Prolouge Header
-    largest = MAX(largest, GET_SIZE(HDRP(bp)));
-    // PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
+    // largest = MAX(largest, GET_SIZE(HDRP(bp)));
 
     /* Old first free previous free points to new free block */
-    // if (old_freestart != NULL){
-    //     PREV_FREE(old_freestart) = bp;
-    // }
-    if (free_start != NULL){
-        PREV_FREE(free_start) = bp;
+    if (old_freestart != NULL){
+        PREV_FREE(old_freestart) = bp;
     }
     /* Prolouge header points to new free block */
     free_start = bp;
-    // NEXT_FREE(heap_start) = bp;
-
-    if(free_end == NULL){
+    // if the length of the freelist is 0, free_start and free_end are the same block
+    if (free_length == 0) {
         free_end = free_start;
     }
+    free_length++;
 }
 
 /*
@@ -383,10 +424,10 @@ static void *coalesce(void *bp)
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
         // NEXT_FREE(heap_start) = bp;
-        if(free_start == free_end){
+        free_start = bp;
+        if(free_length <= 1){
             free_end = bp;
         }
-        free_start = bp;
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  /* Case 4 */
@@ -403,12 +444,12 @@ static void *coalesce(void *bp)
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
         // NEXT_FREE(heap_start) = bp;
-        if(free_start == free_end){
+        free_start = bp;
+        if(free_length <= 1){
             free_end = bp;
         }
-        free_start = bp;
     }
-    largest = MAX(largest, size);
+    // largest = MAX(largest, size);
     return bp;
 }
 
@@ -425,13 +466,14 @@ void removefree(void *bp){
     if(NEXT_FREE(bp) != NULL){
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
     }
-    else {
+    if (bp == free_end) {
         free_end = PREV_FREE(bp);
     }
 
     // SET values in block to NULL that we are removing (might be unneccessary)
     PREV_FREE(bp) = NULL;
     NEXT_FREE(bp) = NULL;
+    free_length--;
 }
 
 static void updateLargest() {
