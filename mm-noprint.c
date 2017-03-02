@@ -250,50 +250,23 @@ static void *find_fit(size_t size) {
 
     void *start = free_start;
     void *end = free_end;
+    int min = 0;
+    int max = free_length;
 
-    for(; start != NULL; start = NEXT_FREE(start)){
-        if(start == end){
-            if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
-                return start;
-            }
-            return NULL;
-        }
+    // search for a fit from both ends of the freelist
+    while(min < max) {
         if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
             return start;
         }
         if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
             return end;
         }
+
+        min++;
+        max--;
+        start = NEXT_FREE(start);
         end = PREV_FREE(end);
-        if(end == start){
-            break;
-        }
     }
-
-    // /* if 0 or 1 Free block in free list */
-    // if(start == end){
-    //     if(start == NULL){
-    //         return NULL;
-    //     }
-    //     else if(size <= ((size_t)GET_SIZE(HDRP(start))))
-    //         return start;
-    // }
-
-    // /* If 2 or more Free blocks in free list */
-    // do{
-    //     if (size <= ((size_t)GET_SIZE(HDRP(start))))
-    //         return start;
-    //     if (size <= ((size_t)GET_SIZE(HDRP(end))))
-    //         return end;
-    //     start = NEXT_FREE(start);
-    //     if (start == end)
-    //         return NULL;
-    //     end = PREV_FREE(end);
-    // }while(start != end);
-
-    // /* Check needed if odd number of free blocks (middle block) */
-    // if (size <= ((size_t)GET_SIZE(HDRP(start))))
-    //     return start;
 
     return NULL;
 }
@@ -377,6 +350,7 @@ void newfree(void *bp)
     if(free_end == NULL){
         free_end = free_start;
     }
+    free_length++;
 }
 
 /*
@@ -461,6 +435,7 @@ void removefree(void *bp){
     // SET values in block to NULL that we are removing (might be unneccessary)
     PREV_FREE(bp) = NULL;
     NEXT_FREE(bp) = NULL;
+    free_length--;
 }
 
 static void updateLargest() {
