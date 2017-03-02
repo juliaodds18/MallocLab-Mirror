@@ -134,7 +134,7 @@ int mm_init(void)
     PUT(HDRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     free_start = NULL;
     free_end = NULL;
-    largest = 0;
+    // largest = 0;
     free_length = 0;
     NEXT_FREE(heap_start) = NULL;
     PREV_FREE(heap_start) = NULL;
@@ -411,9 +411,9 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(bsize, 1));
         PUT(FTRP(bp), PACK(bsize, 1));
     }
-    if(bsize >= largest){
-        updateLargest();
-    }
+    // if(bsize >= largest){
+    //     updateLargest();
+    // }
 }
 
 void newfree(void *bp)
@@ -432,7 +432,7 @@ void newfree(void *bp)
     PREV_FREE(bp) = NULL;
 
     // Put largest free block size in Prolouge Header
-    largest = MAX(largest, GET_SIZE(HDRP(bp)));
+    // largest = MAX(largest, GET_SIZE(HDRP(bp)));
     // PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
 
     /* Old first free previous free points to new free block */
@@ -503,7 +503,7 @@ static void *coalesce(void *bp)
         // NEXT_FREE(heap_start) = bp;
         free_start = bp;
     }
-    largest = MAX(largest, size);
+    // largest = MAX(largest, size);
     return bp;
 }
 
