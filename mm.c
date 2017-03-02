@@ -96,11 +96,12 @@ team_t team = {
 
 
 // Global variables
-char *heap_start = 0x0;
-char *free_start = 0x0;
-size_t largest;
-char *heap_end = 0x0;
-char *free_end = 0x0;
+char *heap_start = 0x0;        // points to the beginning of the heap
+char *heap_end = 0x0;          // points to the end of the heap
+size_t largest;                // size of the largest freeblock
+char *free_start = 0x0;        // points to the beginning of the freelist
+char *free_end = 0x0;          // points to the end of the freelist
+size_t free_length;            // length of freelist
 
 // Function declerations
 int mm_init(void);
@@ -132,7 +133,9 @@ int mm_init(void)
     heap_start += DSIZE;
     PUT(HDRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     free_start = NULL;
+    free_end = NULL;
     largest = 0;
+    free_length = 0;
     NEXT_FREE(heap_start) = NULL;
     PREV_FREE(heap_start) = NULL;
     // PUT(NEXT_FREE(heap_start), 0); // Pointer to first free block
@@ -300,14 +303,33 @@ static void *find_fit(size_t size) {
 
     //Pointer to search through the free list
     void *bp;
+    void* start = free_start;
+    void* end = free_end;
+    int min = 0; 
+    int max = free_length;
+
+    // search for a fit from both ends of the freelist
+    while(min < max) {
+        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
+            return start;
+        }
+        if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
+            return end;
+        }
+
+        min++;
+        max--;
+        start = NEXT_FREE(start);
+        end = PREV_FREE(end);
+    }
 
     //Traverse the free list. Not sure about the middle condition??
-    for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
+    /*for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
     //If our size is smaller than the size of the block, return that block
-        if (size <= ((size_t)GET_SIZE(HDRP(bp)) /* + OVERHEAD */)) {
+        if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
             return bp;
         }
-    }
+    }*/
 
     //No fit, need to extend... Somethings wrong with the largest global var
     return NULL;
@@ -387,6 +409,11 @@ void newfree(void *bp)
     }
     /* Prolouge header points to new free block */
     free_start = bp;
+    // if the length of the freelist is 0, free_start and free_end are the same block
+    if (free_length == 0) {
+        free_end = free_start;
+    }
+    free_length++;
     // NEXT_FREE(heap_start) = bp;
     // PUT(NEXT_FREE(heap_start), bp);
 }
@@ -460,10 +487,14 @@ void removefree(void *bp){
     if(NEXT_FREE(bp) != NULL){
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
     }
+    if (bp == free_end) {
+        free_end = PREV_FREE(bp);
+    }
 
     // SET values in block to NULL that we are removing (might be unneccessary)
     PREV_FREE(bp) = NULL;
     NEXT_FREE(bp) = NULL;
+    free_length--;
 }
 
 static void updateLargest() {
