@@ -442,7 +442,7 @@ void newfree(void *bp)
         PREV_FREE(iter) = bp;
         NEXT_FREE(bp) = iter;
         PREV_FREE(bp) = NULL;
-        first_free = bp;
+        free_start = bp;
         return;
     }
 
