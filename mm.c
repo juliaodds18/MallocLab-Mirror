@@ -464,25 +464,28 @@ static void place(void *bp, size_t asize)
  */
 void newfree(void *bp)
 {
-    /* Get old first pointer on free list */
+    // Get old first pointer on free list 
     void *old_freestart = free_start;
 
-    /* newFree points to old first free */
+    // newFree points to old first free 
     NEXT_FREE(bp) = old_freestart;
 
-    /* Previous free to new free block is 0 (end) */
+    // Previous free to new free block is 0 (end) 
     PREV_FREE(bp) = NULL;
 
-    /* Old first free previous free points to new free block */
+    // Old first free previous free points to new free block 
     if (old_freestart != NULL){
         PREV_FREE(old_freestart) = bp;
     }
-    /* Prolouge header points to new free block */
+	
+    // Prolouge header points to new free block 
     free_start = bp;
-    // if the length of the freelist is 0, free_start and free_end are the same block
+    
+	// If the length of the freelist is 0, free_start and free_end are the same block
     if (free_length == 0) {
         free_end = free_start;
     }
+	
     free_length++;
 }
 
@@ -502,12 +505,12 @@ static void *coalesce(void *bp)
     size_t size = GET_SIZE(HDRP(bp));
 
     // Next and prev are both allocated, nothing to coalesce
-    if (prev_alloc && next_alloc) {         /* Case 1 */
+    if (prev_alloc && next_alloc) {         // Case 1 
         return bp;
     }
 	
     // Next is free, remove/bypass it from freelist before coalescing
-    else if (prev_alloc && !next_alloc){    /* Case 2 */
+    else if (prev_alloc && !next_alloc){    // Case 2 
         removefree(NEXT_BLKP(bp));
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
@@ -515,7 +518,7 @@ static void *coalesce(void *bp)
     }
 	
     // Previous is free, remove/bypass current from freelist before coalescing
-    else if (!prev_alloc && next_alloc){    /* Case 3 */
+    else if (!prev_alloc && next_alloc){    // Case 3 
         removefree(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
         NEXT_FREE(PREV_BLKP(bp)) = NEXT_FREE(bp);
@@ -535,7 +538,7 @@ static void *coalesce(void *bp)
     }
 	
     // Both next and prev are free, remove/bypass both from freelist before coalescing
-    else {                                  /* Case 4 */
+    else {                                  // Case 4 
         removefree(NEXT_BLKP(bp));
         removefree(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
