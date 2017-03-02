@@ -256,7 +256,7 @@ static void *find_fit(size_t size) {
             if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
                 return start;
             }
-            return NULL
+            return NULL;
         }
         if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
             return start;
@@ -266,7 +266,7 @@ static void *find_fit(size_t size) {
         }
         end = PREV_FREE(end);
         if(end == start){
-            break
+            break;
         }
     }
 
