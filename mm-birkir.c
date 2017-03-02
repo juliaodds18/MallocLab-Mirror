@@ -102,7 +102,6 @@ size_t largest;                // size of the largest freeblock
 char *free_start = 0x0;        // points to the beginning of the freelist
 char *free_end = 0x0;          // points to the end of the freelist
 size_t free_length;            // length of freelist
-char *next_fit;
 
 // Function declerations
 int mm_init(void);
@@ -135,7 +134,6 @@ int mm_init(void)
     PUT(HDRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     free_start = NULL;
     free_end = NULL;
-    next_fit = NULL;
     // largest = 0;
     free_length = 0;
     NEXT_FREE(heap_start) = NULL;
@@ -338,48 +336,24 @@ void *mm_realloc(void *ptr, size_t size)
 static void *find_fit(size_t size) {
 
     //Pointer to search through the free list
-    if(free_start == NULL){
-        next_fit = NULL;
-        return NULL;
-    }
-
-    void* start = next_fit;
-    void* end = PREV_FREE(next_fit);
-
-    if(next_fit == NULL){
-        start = free_start;
-        end = NULL;
-    }
+    void* bp;
+    void* fit = NULL;
 
     //Traverse the free list
-    while(1){
-        if(start == end){
-            if (size <= ((size_t)GET_SIZE(HDRP(start)))){
-                next_fit = NEXT_FREE(start);
-                return start;
+    for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
+    //If our size is smaller than the size of the block, return that block
+        if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
+            if(fit == NULL){
+                fit = bp;
             }
-            break;
-        }
-        if (size <= ((size_t)GET_SIZE(HDRP(start)))){
-            next_fit = NEXT_FREE(start);
-            return start;
-        }
-        if(NEXT_FREE(start) == NULL){
-            start = free_start;
-        }
-        else{
-            start = NEXT_FREE(start);
+            else if(GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(fit))){
+                fit = bp;
+            }
         }
     }
-    // for (start = next_fit; start != end; bp = NEXT_FREE(bp)) {
-    // //If our size is smaller than the size of the block, return that block
-    //     if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
-    //         return bp;
-    //     }
-    // }
 
     //No fit, need to extend... Somethings wrong with the largest global var
-    return NULL;
+    return fit;
 }
 
 static void *extend_heap(size_t words)
@@ -534,9 +508,6 @@ void removefree(void *bp){
     }
     if (bp == free_end) {
         free_end = PREV_FREE(bp);
-    }
-    if (bp == next_fit){
-        next_fit = NEXT_FREE(bp);
     }
 
     // SET values in block to NULL that we are removing (might be unneccessary)
