@@ -251,30 +251,49 @@ static void *find_fit(size_t size) {
     void *start = free_start;
     void *end = free_end;
 
-    /* if 0 or 1 Free block in free list */
-    if(start == end){
-        if(start == NULL){
-            return NULL;
+    for(; start != NULL; start = NEXT_FREE(start)){
+        if(start == end){
+            if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
+                return start;
+            }
+            return NULL
         }
-        else if(size <= ((size_t)GET_SIZE(HDRP(start))))
+        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
             return start;
+        }
+        if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
+            return end;
+        }
+        end = PREV_FREE(end);
+        if(end == start){
+            break
+        }
     }
 
-    /* If 2 or more Free blocks in free list */
-    do{
-        if (size <= ((size_t)GET_SIZE(HDRP(start))))
-            return start;
-        if (size <= ((size_t)GET_SIZE(HDRP(end))))
-            return end;
-        start = NEXT_FREE(start);
-        if (start == end)
-            return NULL;
-        end = PREV_FREE(end);
-    }while(start != end);
+    // /* if 0 or 1 Free block in free list */
+    // if(start == end){
+    //     if(start == NULL){
+    //         return NULL;
+    //     }
+    //     else if(size <= ((size_t)GET_SIZE(HDRP(start))))
+    //         return start;
+    // }
 
-    /* Check needed if odd number of free blocks (middle block) */
-    if (size <= ((size_t)GET_SIZE(HDRP(start))))
-        return start;
+    // /* If 2 or more Free blocks in free list */
+    // do{
+    //     if (size <= ((size_t)GET_SIZE(HDRP(start))))
+    //         return start;
+    //     if (size <= ((size_t)GET_SIZE(HDRP(end))))
+    //         return end;
+    //     start = NEXT_FREE(start);
+    //     if (start == end)
+    //         return NULL;
+    //     end = PREV_FREE(end);
+    // }while(start != end);
+
+    // /* Check needed if odd number of free blocks (middle block) */
+    // if (size <= ((size_t)GET_SIZE(HDRP(start))))
+    //     return start;
 
     return NULL;
 }
