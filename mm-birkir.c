@@ -269,7 +269,27 @@ void *mm_realloc(void *ptr, size_t size)
     if(!GET_ALLOC(HDRP(PREV_BLKP(ptr)))){
         size_t bsize = currSize + prevSize;
         if(asize <= bsize){
-
+            if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
+                void* prev = PREV_BLKP(ptr);
+                removefree(prev);
+                PUT(HDRP(prev), PACK(asize, 1));
+                PUT(FTRP(prev), PACK(asize, 1));
+                memcpy(prev, ptr, currSize);
+                nfree = NEXT_BLKP(prev);
+                PUT(HDRP(nfree), PACK(bsize-asize, 0));
+                PUT(FTRP(nfree), PACK(bsize-asize, 0));
+                newfree(nfree);
+                coalesce(nfree);
+                return prev;
+            }
+            else {
+                void* prev = PREV_BLKP(ptr);
+                removefree(prev);
+                PUT(HDRP(prev), PACK(asize, 1));
+                PUT(FTRP(prev), PACK(asize, 1));
+                memcpy(prev, ptr, currSize);
+                return prev;
+            }
         }
     }
 
