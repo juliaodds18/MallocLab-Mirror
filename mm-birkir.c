@@ -338,9 +338,10 @@ static void *find_fit(size_t size) {
     //Pointer to search through the free list
     void* bp;
     void* fit = NULL;
+    size_t count = 0;
 
     //Traverse the free list
-    for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
+    for (bp = free_start; bp != NULL && count < 3; bp = NEXT_FREE(bp)) {
     //If our size is smaller than the size of the block, return that block
         if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
             if(fit == NULL){
@@ -349,6 +350,7 @@ static void *find_fit(size_t size) {
             else if(GET_SIZE(HDRP(bp)) < GET_SIZE(HDRP(fit))){
                 fit = bp;
             }
+            count++;
         }
     }
 
