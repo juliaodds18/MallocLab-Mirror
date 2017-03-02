@@ -516,10 +516,10 @@ void newfree(void *bp)
  */
 static void *coalesce(void *bp)
 {
-    void *nbp = NEXT_BLKP(bp);
-    void *pbp = PREV_BLKP(bp);
-    size_t prev_alloc = GET_ALLOC(FTRP(pbp));
-    size_t next_alloc = GET_ALLOC(HDRP(nbp));
+    void *nextbp = NEXT_BLKP(bp);
+    void *prevbp = PREV_BLKP(bp);
+    size_t prev_alloc = GET_ALLOC(FTRP(prevbp));
+    size_t next_alloc = GET_ALLOC(HDRP(nextbp));
     size_t size = GET_SIZE(HDRP(bp));
 
     // Next and prev are both allocated, nothing to coalesce
@@ -528,21 +528,21 @@ static void *coalesce(void *bp)
     }
     // Next is free, remove/bypass it from freelist before coalescing
     else if (prev_alloc && !next_alloc){    // Case 2 
-        void* nbp = NEXT_BLKP(bp);
-        removefree(nbp);
-        size += GET_SIZE(HDRP(nbp));
+        void* nextbp = NEXT_BLKP(bp);
+        removefree(nextbp);
+        size += GET_SIZE(HDRP(nextbp));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
     // Previous is free, remove/bypass it from freelist before coalescing
     else if (!prev_alloc && next_alloc){    // Case 3 
-        void *pbp = PREV_BLKP(bp);
-        removefree(pbp);
-        size += GET_SIZE(HDRP(pbp));
-        NEXT_FREE(pbp) = NEXT_FREE(bp);
-        PREV_FREE(pbp) = NULL;
+        void *prevbp = PREV_BLKP(bp);
+        removefree(prevbp);
+        size += GET_SIZE(HDRP(prevbp));
+        NEXT_FREE(prevbp) = NEXT_FREE(bp);
+        PREV_FREE(prevbp) = NULL;
         PUT(FTRP(bp), PACK(size, 0));
-        bp = pbp;
+        bp = prevbp;
         PUT(HDRP(bp), PACK(size, 0));
         if(NEXT_FREE(bp) != NULL){
             PREV_FREE(NEXT_FREE(bp)) = bp;
@@ -554,17 +554,17 @@ static void *coalesce(void *bp)
     }
     // Both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  // Case 4 
-        pbp = PREV_BLKP(bp);
-        nbp = NEXT_BLKP(bp);
-        removefree(nbp);
-        removefree(pbp);
-        size += GET_SIZE(HDRP(pbp));
-        size += GET_SIZE(HDRP(nbp));
-        NEXT_FREE(pbp) = NEXT_FREE(bp);
-        PREV_FREE(pbp) = NULL;
-        PUT(HDRP(pbp), PACK(size, 0));
-        PUT(FTRP(nbp), PACK(size, 0));
-        bp = pbp;
+        prevbp = PREV_BLKP(bp);
+        nextbp = NEXT_BLKP(bp);
+        removefree(nextbp);
+        removefree(prevbp);
+        size += GET_SIZE(HDRP(prevbp));
+        size += GET_SIZE(HDRP(nextbp));
+        NEXT_FREE(prevbp) = NEXT_FREE(bp);
+        PREV_FREE(prevbp) = NULL;
+        PUT(HDRP(prevbp), PACK(size, 0));
+        PUT(FTRP(nextbp), PACK(size, 0));
+        bp = prevbp;
         if(NEXT_FREE(bp) != NULL){
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
