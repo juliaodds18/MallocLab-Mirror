@@ -335,7 +335,6 @@ void *mm_realloc(void *ptr, size_t size)
 static void *find_fit(size_t size) {
 
     //Pointer to search through the free list
-    void *bp;
     void* start = free_start;
     void* end = free_end;
     int min = 0;
@@ -356,8 +355,8 @@ static void *find_fit(size_t size) {
         end = PREV_FREE(end);
     }
 
-    //Traverse the free list. Not sure about the middle condition??
-    /*for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
+    //Traverse the free list
+    /*for (start = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
     //If our size is smaller than the size of the block, return that block
         if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
             return bp;
