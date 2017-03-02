@@ -274,8 +274,8 @@ void *mm_realloc(void *ptr, size_t size)
                 void* prev = PREV_BLKP(ptr);
                 removefree(prev);
                 PUT(HDRP(prev), PACK(asize, 1));
-                PUT(FTRP(prev), PACK(asize, 1));
                 memcpy(prev, ptr, currSize);
+                PUT(FTRP(prev), PACK(asize, 1));
                 nfree = NEXT_BLKP(prev);
                 PUT(HDRP(nfree), PACK(bsize-asize, 0));
                 PUT(FTRP(nfree), PACK(bsize-asize, 0));
