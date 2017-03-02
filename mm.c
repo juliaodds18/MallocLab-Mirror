@@ -219,14 +219,14 @@ void mm_free(void *bp)
 void *mm_realloc(void *ptr, size_t size)
 {
     void *newptr;
-    size_t alignedSize = ALIGN(size + SIZE_T_SIZE); 
+    size_t alignedSize = ALIGN(size + SIZE_T_SIZE);
     size_t currSize = GET_SIZE(HDRP(ptr));
     if (size <= 0) {
         printf("Size <= 0\n"); fflush(stdout);
         mm_free(ptr);
-        return 0x0;   
+        return 0x0;
     }
-    
+
     if (ptr == NULL) {
 	printf("ptr == null\n"); fflush(stdout);
 	return mm_malloc(size);
@@ -236,13 +236,13 @@ void *mm_realloc(void *ptr, size_t size)
         //printf("alignedsize == currsize\n"); fflush(stdout);
         return ptr;
     }
-    
+
 
     //If the aligned size, plus header and footer space, is smaller than current size, shrink the block
-    //This never happens in the test cases, but looks pretty 
-    if (alignedSize + OVERHEAD < currSize) { 
+    //This never happens in the test cases, but looks pretty
+    if (alignedSize + OVERHEAD < currSize) {
         //Resize current block
-        PUT(HDRP(ptr), PACK(alignedSize, 1)); 
+        PUT(HDRP(ptr), PACK(alignedSize, 1));
         PUT(FTRP(ptr), PACK(alignedSize, 1));
         //Create new free block
         void *next = NEXT_BLKP(ptr);
@@ -252,7 +252,7 @@ void *mm_realloc(void *ptr, size_t size)
         coalesce(next);
         return ptr;
     }
-    
+
     size_t prevSize = GET_SIZE(HDRP(PREV_BLKP(ptr)));
 /*
     //If the previous block is free, move the memory over there and extend into the current block
@@ -263,42 +263,42 @@ void *mm_realloc(void *ptr, size_t size)
 	    //Move the current block into the previous block
             void* prev = PREV_BLKP(ptr);
             removefree(prev);
-            //memcpy(prev, ptr, currSize); 
-            //Since we don't want a new footer to override memory, we first need to alloc the entire space, then resize it after we memcpy 
+            //memcpy(prev, ptr, currSize);
+            //Since we don't want a new footer to override memory, we first need to alloc the entire space, then resize it after we memcpy
             PUT(HDRP(prev), PACK(currSize + prevSize, 1));
             PUT(FTRP(prev), PACK(currSize + prevSize, 1));
-            memcpy(prev, ptr, currSize); 
+            memcpy(prev, ptr, currSize);
             PUT(HDRP(prev), PACK(alignedSize, 1));
             PUT(FTRP(prev), PACK(alignedSize, 1));
-            
+
             //Create the new free block behind the one we just allocated
             ptr = NEXT_BLKP(prev);
             PUT(HDRP(ptr), PACK(currSize + prevSize - alignedSize, 0));
             PUT(FTRP(ptr), PACK(currSize + prevSize - alignedSize, 0));
             newfree(ptr);
             coalesce(ptr);
-            
+
             return prev;
- 
+
         }
 
     }*/
 
     //If the previous block contains enough space for the alignedSize, move there
 /*    if(GET_ALLOC(HDRP(PREV_BLKP(ptr))) == 0 && (prevSize > alignedSize)) {
-    
+
         void* prev = PREV_BLKP(ptr);
         removefree(prev);
-        PUT(HDRP(prev), PACK(currSize + prevSize, 1)); 
+        PUT(HDRP(prev), PACK(currSize + prevSize, 1));
         PUT(FTRP(prev), PACK(currSize + prevSize, 1));
-        memcpy(prev, ptr, currSize); 
-        mm_free(ptr); 
-        return prev; 
+        memcpy(prev, ptr, currSize);
+        mm_free(ptr);
+        return prev;
     }
 
 */
     size_t nextSize = GET_SIZE(HDRP(NEXT_BLKP(ptr)));
-   
+
     //If the next block is free, and there is enough space for the new size in the current block and next block combined, extend the block
     if(GET_ALLOC(HDRP(NEXT_BLKP(ptr))) == 0 && (currSize + nextSize > alignedSize + OVERHEAD)) {
 
@@ -310,11 +310,11 @@ void *mm_realloc(void *ptr, size_t size)
             void* next = NEXT_BLKP(ptr);
             //Not sure if this is the correct size, check for overhead
             PUT(HDRP(next), PACK(currSize + nextSize - alignedSize, 0));
-            PUT(HDRP(next), PACK(currSize + nextSize - alignedSize, 0)); 
+            PUT(HDRP(next), PACK(currSize + nextSize - alignedSize, 0));
             newfree(next);
             return ptr;
         }
-        //If not, just take up the entire next block 
+        //If not, just take up the entire next block
         else {
             removefree(NEXT_BLKP(ptr));
             PUT(HDRP(ptr), PACK(nextSize + currSize, 1));
@@ -328,7 +328,7 @@ void *mm_realloc(void *ptr, size_t size)
     memcpy(newptr, ptr, alignedSize);
     mm_free(ptr);
     ptr = NULL;
-    
+
     return newptr;
 }
 
@@ -338,7 +338,7 @@ static void *find_fit(size_t size) {
     void *bp;
     void* start = free_start;
     void* end = free_end;
-    int min = 0; 
+    int min = 0;
     int max = free_length;
 
     // search for a fit from both ends of the freelist
@@ -432,7 +432,7 @@ void newfree(void *bp)
     PREV_FREE(bp) = NULL;
 
     // Put largest free block size in Prolouge Header
-    largest = MAX(largest, GET_SIZE(bp));
+    largest = MAX(largest, GET_SIZE(HDRP(bp)));
     // PUT(PREV_FREE(heap_start), MAX(GET(PREV_FREE(heap_start)), GET_SIZE(bp)));
 
     /* Old first free previous free points to new free block */
@@ -534,8 +534,8 @@ static void updateLargest() {
     void *bp;
     largest = 0;
     for (bp = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
-        if (GET_SIZE(bp) > largest) {
-            largest = GET_SIZE(bp);
+        if (GET_SIZE(HDRP(bp)) > largest) {
+            largest = GET_SIZE(HDRP(bp));
         }
     }
 }
