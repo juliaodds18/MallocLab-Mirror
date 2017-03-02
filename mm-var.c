@@ -486,7 +486,7 @@ static void *coalesce(void *bp)
         removefree(nbp);
         removefree(pbp);
         size += GET_SIZE(HDRP(pbp));
-        size += GET_SIZE(HDRP(pbp));
+        size += GET_SIZE(HDRP(nbp));
         NEXT_FREE(pbp) = NEXT_FREE(bp);
         PREV_FREE(pbp) = NULL;
         PUT(HDRP(pbp), PACK(size, 0));
