@@ -485,6 +485,9 @@ static void *coalesce(void *bp)
         }
         // NEXT_FREE(heap_start) = bp;
         free_start = bp;
+        if(free_length <= 1){
+            free_end = bp;
+        }
     }
     // both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  /* Case 4 */
@@ -502,6 +505,9 @@ static void *coalesce(void *bp)
         }
         // NEXT_FREE(heap_start) = bp;
         free_start = bp;
+        if(free_length <= 1){
+            free_end = bp;
+        }
     }
     // largest = MAX(largest, size);
     return bp;
