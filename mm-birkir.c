@@ -357,7 +357,7 @@ static void *find_fit(size_t size) {
         if (start == end)
             return NULL;
         end = PREV_FREE(end);
-    } while(start != end)
+    }while(start != end);
 
     /* Check needed if odd number of free blocks (middle block) */
     if (size <= ((size_t)GET_SIZE(HDRP(start))))
