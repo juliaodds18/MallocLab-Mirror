@@ -369,6 +369,7 @@ void *mm_realloc(void *ptr, size_t size)
 
 /*
  * find_fit - Find place for the new block on the heap.
+ * Implements a first-fit policy that searches the heap from both ends.
  */
 static void *find_fit(size_t size) {
 
@@ -378,7 +379,7 @@ static void *find_fit(size_t size) {
     int min = 0;
     int max = free_length;
 
-    // search for a fit from both ends of the freelist
+    // Search for a fit from both ends of the free list
     while(min < max) {
         if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
             return start;
@@ -393,15 +394,7 @@ static void *find_fit(size_t size) {
         end = PREV_FREE(end);
     }
 
-    //Traverse the free list
-    /*for (start = free_start; bp != NULL; bp = NEXT_FREE(bp)) {
-    //If our size is smaller than the size of the block, return that block
-        if (size <= ((size_t)GET_SIZE(HDRP(bp)))) {
-            return bp;
-        }
-    }*/
-
-    //No fit, need to extend... Somethings wrong with the largest global var
+    //No fit, need to extend
     return NULL;
 }
 
@@ -437,6 +430,12 @@ static void *extend_heap(size_t words)
 
 }
 
+/*
+ * place - Place a new block on the heap
+ * Allocate the space by adding a header and footer with the size of the block 
+ * and an alloc-bit set to 1. If there is enough space remaining behind the newly 
+ * allocated block, then create a new free block there and add it to the list.
+ */
 static void place(void *bp, size_t asize)
 {
     size_t bsize = GET_SIZE(HDRP(bp));
@@ -474,9 +473,6 @@ void newfree(void *bp)
     /* Previous free to new free block is 0 (end) */
     PREV_FREE(bp) = NULL;
 
-    // Put largest free block size in Prolouge Header
-    // largest = MAX(largest, GET_SIZE(HDRP(bp)));
-
     /* Old first free previous free points to new free block */
     if (old_freestart != NULL){
         PREV_FREE(old_freestart) = bp;
@@ -491,7 +487,13 @@ void newfree(void *bp)
 }
 
 /*
- * coalesce - boundary tag coalescing. Return ptr to coalesced block
+ * coalesce - Boundary tag coalescing. 
+ * There are four seperate cases: 
+ *   - 1. Both previous and next blocks are free. Nothing to coalesce.
+ *   - 2. Next block is free. Remove it from free list, and coalesce.
+ *   - 3. Previous block is free. Remove current block from free list and coalesce with previous.
+ *   - 4. Both previous and next are free. Remove next and current from free list, coalesce with previous.
+ * Return ptr to coalesced block
  */
 static void *coalesce(void *bp)
 {
@@ -499,18 +501,20 @@ static void *coalesce(void *bp)
     size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
     size_t size = GET_SIZE(HDRP(bp));
 
-    // next and prev are both allocated, nothing to coalesce
+    // Next and prev are both allocated, nothing to coalesce
     if (prev_alloc && next_alloc) {         /* Case 1 */
         return bp;
     }
-    // next is free, remove/bypass it from freelist before coalescing
+	
+    // Next is free, remove/bypass it from freelist before coalescing
     else if (prev_alloc && !next_alloc){    /* Case 2 */
         removefree(NEXT_BLKP(bp));
         size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
-    // previous is free, remove/bypass it from freelist before coalescing
+	
+    // Previous is free, remove/bypass current from freelist before coalescing
     else if (!prev_alloc && next_alloc){    /* Case 3 */
         removefree(PREV_BLKP(bp));
         size += GET_SIZE(HDRP(PREV_BLKP(bp)));
@@ -519,16 +523,18 @@ static void *coalesce(void *bp)
         PUT(FTRP(bp), PACK(size, 0));
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+		
         if(NEXT_FREE(bp) != NULL){
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
-        // NEXT_FREE(heap_start) = bp;
+		
         free_start = bp;
         if(free_length <= 1){
             free_end = bp;
         }
     }
-    // both next and prev are free, remove/bypass both from freelist before coalescing
+	
+    // Both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  /* Case 4 */
         removefree(NEXT_BLKP(bp));
         removefree(PREV_BLKP(bp));
@@ -539,42 +545,49 @@ static void *coalesce(void *bp)
         PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
         PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
         bp = PREV_BLKP(bp);
+		
         if(NEXT_FREE(bp) != NULL){
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
-        // NEXT_FREE(heap_start) = bp;
+		
         free_start = bp;
         if(free_length <= 1){
             free_end = bp;
         }
     }
-    // largest = MAX(largest, size);
     return bp;
 }
 
-void removefree(void *bp){
-    // if(free_start == bp){
-    //     free_start = NEXT_FREE(bp);
-    // }
+/*
+ * removefree - Remove block from free list
+ * Since the free list is doubly linked, we need to update pointers 
+ * in both next and previous block, removing the current block from the list.
+ */
+void removefree(void *bp)
+{
+	// Rerouting the next-pointer of the previous block 
     if(PREV_FREE(bp) != NULL){
         NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
     }
     else {
         free_start = NEXT_FREE(bp);
     }
+	
+	// Rerouting the prev-pointer of the next block
     if(NEXT_FREE(bp) != NULL){
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
     }
     if (bp == free_end) {
         free_end = PREV_FREE(bp);
     }
-
-    // SET values in block to NULL that we are removing (might be unneccessary)
     PREV_FREE(bp) = NULL;
     NEXT_FREE(bp) = NULL;
     free_length--;
 }
 
+/*
+ * printblock - Prints the contents of a block. Used for debugging.
+ */
 static void printblock(void *bp)
 {
     size_t hsize, halloc, fsize, falloc;
@@ -595,6 +608,9 @@ static void printblock(void *bp)
            fsize, (falloc ? 'a' : 'f'));
 }
 
+/*
+ * printfreelist - Prints the entire free list. Used for debugging.
+ */
 static void printfreelist()
 {
     printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
@@ -607,23 +623,27 @@ static void printfreelist()
     fflush(stdout);
 }
 
+/*
+ * mm_check - Heap consistency checker. Used for debugging. 
+ */
 int mm_check(void)
 {
+	//Goung through free list, checking to see if every block in the free list has its alloc-bit set to 0.
     printf("Is every block in the free list actually free?\n"); fflush(stdout);
     char* iter;
 
     for(iter = free_start; iter != NULL; iter = NEXT_FREE(iter)) {
-        //iter = HDRP(iter);
+
         if(GET_ALLOC(HDRP(iter)) == 0x1) {
             printf("Block at location %p is in free list but not free\n", iter); fflush(stdout);
-            exit(-1);  //Should I exit?
+            exit(-1); 
         }
     }
 
 
     printf("Are there any contiguous free blocks that somehow escaped coalescing?\n"); fflush(stdout);
 
-    /* Going through free list, checking both previous and next blocks. If they are free, then they have ecaped coalescing.*/
+    // Going through free list, checking both previous and next blocks. If they are free, then they have ecaped coalescing.
 
     iter = free_start;
     while(iter != NULL) {
@@ -641,7 +661,7 @@ int mm_check(void)
     }
 
 
-    /* For each free block, go through free list, see if there is a match. If not, there is a free block not in the free list.*/
+    // For each free block, go through free list, see if there is a match. If not, there is a free block not in the free list.
     printf("Is every free block actually in the free list? \n"); fflush(stdout);
 
     iter = heap_start;
@@ -665,7 +685,7 @@ int mm_check(void)
         iter = NEXT_BLKP(iter);
     }
 
-    /*Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap. */
+    // Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap. 
 
     printf("Do any allocd blocks overlap?\n"); fflush(stdout);
 
@@ -682,7 +702,7 @@ int mm_check(void)
         iter = NEXT_BLKP(iter);
     }
 
-    /*Check if pointers in heap point to valid addresses. If they are less than heap_start or greater than heap_end, then they are invalid.*/
+    // Check if pointers in heap point to valid addresses. If they are less than heap_start or greater than heap_end, then they are invalid.
 
     printf("Do pointers in heap point to valid addresses? \n"); fflush(stdout);
 
