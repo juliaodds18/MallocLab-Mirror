@@ -39,8 +39,9 @@
  * |     |       block         |   Allocated by user   |   block  |
  *  --------------------------------------------------------------
  *
- * Our implementation uses ___ fit policy for finding blocks, LIFO policy
- * for adding free blocks into the free list, and coalescing is immediate.
+ * Our implementation uses a version of first fit policy for finding 
+ * blocks, LIFO policy for adding free blocks into the free list, and 
+ * coalescing is immediate.
  *
  */
 #include <stdio.h>
@@ -146,13 +147,14 @@ void *mm_realloc(void *ptr, size_t size);
 // Function prototypes for internal helper routines
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
-void newfree(void *bp);
-void removefree(void *bp);
+static void newfree(void *bp);
+static void removefree(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
-static void updateLargest();
 static void printblock(void *bp);
-static void printfreelist();
+void printfreelist(void);
+int mm_check(void);
+void printfreelist();
 
 /*
  * mm_init - Initialize the malloc package.
@@ -478,7 +480,7 @@ static void place(void *bp, size_t asize)
 /*
  * newfree - Adding a free block into the free list.
  */
-void newfree(void *bp)
+static void newfree(void *bp)
 {
     if(GET_SIZE(HDRP(bp)) >= BIGB){
         bigblocks++;
@@ -582,7 +584,7 @@ static void *coalesce(void *bp)
  * Since the free list is doubly linked, we need to update pointers 
  * in both next and previous block, removing the current block from the list.
  */
-void removefree(void *bp)
+static void removefree(void *bp)
 {
 	// Rerouting the next-pointer of the previous block 
     if(PREV_FREE(bp) != NULL){
@@ -631,7 +633,7 @@ static void printblock(void *bp)
 /*
  * printfreelist - Prints the entire free list. Used for debugging.
  */
-static void printfreelist()
+void printfreelist(void)
 {
     printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
     printf("free_start: %p free_end: %p\n", free_start, free_end);

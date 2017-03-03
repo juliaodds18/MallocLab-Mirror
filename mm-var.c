@@ -39,8 +39,9 @@
  * |     |       block         |   Allocated by user   |   block  |
  *  --------------------------------------------------------------
  *
- * Our implementation uses ___ fit policy for finding blocks, LIFO policy
- * for adding free blocks into the free list, and coalescing is immediate.
+ * Our implementation uses a version of first fit policy for finding
+ * blocks, LIFO policy for adding free blocks into the free list, and
+ * coalescing is immediate.
  *
  */
 #include <stdio.h>
@@ -146,13 +147,14 @@ void *mm_realloc(void *ptr, size_t size);
 // Function prototypes for internal helper routines
 static void *extend_heap(size_t words);
 static void *coalesce(void *bp);
-void newfree(void *bp);
-void removefree(void *bp);
+static void newfree(void *bp);
+static void removefree(void *bp);
 static void *find_fit(size_t size);
 static void place(void *bp, size_t asize);
-static void updateLargest();
 static void printblock(void *bp);
-static void printfreelist();
+void printfreelist(void);
+int mm_check(void);
+void printfreelist();
 
 /*
  * mm_init - Initialize the malloc package.
@@ -210,7 +212,7 @@ void *mm_malloc(size_t size)
 	// Align the size
     asize = ALIGN(size + SIZE_T_SIZE);
     extendsize = MAX(asize,CHUNKSIZE);
-	
+
 	//Find fit. If no fit is found, extend the heap
 	// Extend the heap by the larger of the two: Aligned size or chunksize (2^12)
     if(asize >= BIGB && !bigblocks){
@@ -233,7 +235,7 @@ void *mm_malloc(size_t size)
 /*
  * mm_free - Freeing a block from the heap.
  * First, update alloc-bit of the header and footer.
- * Then, add the block to the free list and coalesce with adjacent blocks. 
+ * Then, add the block to the free list and coalesce with adjacent blocks.
  */
 void mm_free(void *bp)
 {
@@ -251,12 +253,12 @@ void mm_free(void *bp)
  * If the size is less than or equal to zero, free the block at ptr.
  * If ptr is NULL, allocate block with the appropriate size.
  * If the size passed as parameter is equal to the size of the block, return ptr.
- * Copying is very expensive. Therefore, we would like to avoid doing so at all costs. 
- * First, we check if we can extend the block into the next block. 
+ * Copying is very expensive. Therefore, we would like to avoid doing so at all costs.
+ * First, we check if we can extend the block into the next block.
  * If that doesn't work, we check if we can move it back into the previous block.
  * As a last resort, we check if the block can merge with both the previous and next block.
  * If none of that works, we have to allocate a new block elsewhere, copy the data
- * and free the block. 
+ * and free the block.
  */
 void *mm_realloc(void *ptr, size_t size)
 {
@@ -284,6 +286,25 @@ void *mm_realloc(void *ptr, size_t size)
     size_t prevSize = GET_SIZE(HDRP(PREV_BLKP(ptr)));
     size_t nextSize = GET_SIZE(HDRP(NEXT_BLKP(ptr)));
     size_t bsize;
+    size_t extendsize;
+
+    // Special case where epilogue block is the next block
+    if(!nextSize){
+        extendsize = MAX((asize-currSize),CHUNKSIZE);
+        if (extend_heap(extendsize/WSIZE) == NULL) {
+            return NULL;
+        }
+    }
+    else if(!GET_ALLOC(HDRP(NEXT_BLKP(ptr))) &&
+            !GET_SIZE(HDRP(NEXT_BLKP(NEXT_BLKP(ptr))))){
+        bsize = currSize + nextSize;
+        if (asize > bsize){
+            extendsize = MAX((asize-bsize),CHUNKSIZE);
+            if (extend_heap(extendsize/WSIZE) == NULL) {
+                return NULL;
+            }
+        }
+    }
 
     //If the next block is free, and there is enough space for the new size in the current block and next block combined, extend the block
     if(!GET_ALLOC(HDRP(NEXT_BLKP(ptr)))){
@@ -409,10 +430,10 @@ static void *find_fit(size_t size) {
 }
 
 /*
- * extend_heap - Create more space on the heap. 
+ * extend_heap - Create more space on the heap.
  * Pass the number of words to the function. That is how much the heap should be extended.
  * Increase the size of the heap.
- * Initialize the free block header and footer, as well as the epilogue. 
+ * Initialize the free block header and footer, as well as the epilogue.
  * Add the new free block to the heap.
  * If the previous block is free, coalesce them.
  */
@@ -421,15 +442,15 @@ static void *extend_heap(size_t words)
     char *bp;
     size_t size;
 
-    // Allocate an even number of words to maintain alignment 
+    // Allocate an even number of words to maintain alignment
     size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
     if((bp = mem_sbrk(size)) == (void *)-1){
         return NULL;
     }
 
-    // Initialize free block header/footer and the epilogue header 
-    PUT(HDRP(bp), PACK(size, 0));         // free block header 
-    PUT(FTRP(bp), PACK(size, 0));         // free block footer 
+    // Initialize free block header/footer and the epilogue header
+    PUT(HDRP(bp), PACK(size, 0));         // free block header
+    PUT(FTRP(bp), PACK(size, 0));         // free block footer
     PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); // new epilogue header
 
     newfree(bp);
@@ -441,8 +462,8 @@ static void *extend_heap(size_t words)
 
 /*
  * place - Place a new block on the heap
- * Allocate the space by adding a header and footer with the size of the block 
- * and an alloc-bit set to 1. If there is enough space remaining behind the newly 
+ * Allocate the space by adding a header and footer with the size of the block
+ * and an alloc-bit set to 1. If there is enough space remaining behind the newly
  * allocated block, then create a new free block there and add it to the list.
  */
 static void place(void *bp, size_t asize)
@@ -478,26 +499,26 @@ static void place(void *bp, size_t asize)
 /*
  * newfree - Adding a free block into the free list.
  */
-void newfree(void *bp)
+static void newfree(void *bp)
 {
     if(GET_SIZE(HDRP(bp)) >= BIGB){
         bigblocks++;
     }
-	
-    // newFree points to old free_start 
+
+    // newFree points to old free_start
     NEXT_FREE(bp) = free_start;
 
-    // Previous free to new free block is 0 (end) 
+    // Previous free to new free block is 0 (end)
     PREV_FREE(bp) = NULL;
 
     // Old first free previous free points to new free block
     if (free_start != NULL){
         PREV_FREE(free_start) = bp;
     }
-	
-    // Prolouge header points to new free block 
+
+    // Prolouge header points to new free block
     free_start = bp;
-	
+
     // If the length of the freelist is 0, free_start and free_end are the same block
     if (free_length == 0) {
         free_end = free_start;
@@ -506,8 +527,8 @@ void newfree(void *bp)
 }
 
 /*
- * coalesce - Boundary tag coalescing. 
- * There are four seperate cases: 
+ * coalesce - Boundary tag coalescing.
+ * There are four seperate cases:
  *   1. Both previous and next blocks are free. Nothing to coalesce.
  *   2. Next block is free. Remove it from free list, and coalesce.
  *   3. Previous block is free. Remove current block from free list and coalesce with previous.
@@ -523,11 +544,11 @@ static void *coalesce(void *bp)
     size_t size = GET_SIZE(HDRP(bp));
 
     // Next and prev are both allocated, nothing to coalesce
-    if (prev_alloc && next_alloc) {         // Case 1 
+    if (prev_alloc && next_alloc) {         // Case 1
         return bp;
     }
     // Next is free, remove/bypass it from freelist before coalescing
-    else if (prev_alloc && !next_alloc){    // Case 2 
+    else if (prev_alloc && !next_alloc){    // Case 2
         void* nextbp = NEXT_BLKP(bp);
         removefree(nextbp);
         size += GET_SIZE(HDRP(nextbp));
@@ -535,7 +556,7 @@ static void *coalesce(void *bp)
         PUT(FTRP(bp), PACK(size, 0));
     }
     // Previous is free, remove/bypass it from freelist before coalescing
-    else if (!prev_alloc && next_alloc){    // Case 3 
+    else if (!prev_alloc && next_alloc){    // Case 3
         void *prevbp = PREV_BLKP(bp);
         removefree(prevbp);
         size += GET_SIZE(HDRP(prevbp));
@@ -553,7 +574,7 @@ static void *coalesce(void *bp)
         }
     }
     // Both next and prev are free, remove/bypass both from freelist before coalescing
-    else {                                  // Case 4 
+    else {                                  // Case 4
         prevbp = PREV_BLKP(bp);
         nextbp = NEXT_BLKP(bp);
         removefree(nextbp);
@@ -573,18 +594,18 @@ static void *coalesce(void *bp)
             free_end = bp;
         }
     }
-	
+
     return bp;
 }
 
 /*
  * removefree - Remove block from free list
- * Since the free list is doubly linked, we need to update pointers 
+ * Since the free list is doubly linked, we need to update pointers
  * in both next and previous block, removing the current block from the list.
  */
-void removefree(void *bp)
+static void removefree(void *bp)
 {
-	// Rerouting the next-pointer of the previous block 
+	// Rerouting the next-pointer of the previous block
     if(PREV_FREE(bp) != NULL){
         NEXT_FREE(PREV_FREE(bp)) = NEXT_FREE(bp);
     }
@@ -631,7 +652,7 @@ static void printblock(void *bp)
 /*
  * printfreelist - Prints the entire free list. Used for debugging.
  */
-static void printfreelist()
+void printfreelist(void)
 {
     printf("--- PRINTING ENTIRE FREE LIST FOR GODS SAKE ---\n");
     printf("free_start: %p free_end: %p\n", free_start, free_end);
@@ -644,7 +665,7 @@ static void printfreelist()
 }
 
 /*
- * mm_check - Heap consistency checker. Used for debugging. 
+ * mm_check - Heap consistency checker. Used for debugging.
  */
 int mm_check(void)
 {
@@ -656,7 +677,7 @@ int mm_check(void)
 
         if(GET_ALLOC(HDRP(iter)) == 0x1) {
             printf("Block at location %p is in free list but not free\n", iter); fflush(stdout);
-            exit(-1); 
+            exit(-1);
         }
     }
 
@@ -696,7 +717,7 @@ int mm_check(void)
                     break;
                 }
             }
-        
+
 
             if(!found) {
                 printf("Block at location %p is free but not in the free list. \n", iter); fflush(stdout);
@@ -705,7 +726,7 @@ int mm_check(void)
         iter = NEXT_BLKP(iter);
     }
 
-    // Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap. 
+    // Check if there are any corrupted blocks. If the size in the header and footer are not the same, there has been an overlap.
 
     printf("Do any allocd blocks overlap?\n"); fflush(stdout);
 
