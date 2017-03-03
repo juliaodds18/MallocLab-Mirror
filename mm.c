@@ -126,6 +126,8 @@ team_t team = {
 #define PREV_FREE(bp) (*(void **)((bp)))
 #define NEXT_FREE(bp) (*(void **)((bp) + WSIZE))
 
+// Big block constant
+#define BIGB (1<<11)
 
 // Global variables
 char *heap_start = 0x0;        // Points to the beginning of the heap
@@ -133,6 +135,7 @@ char *heap_end = 0x0;          // Points to the end of the heap
 char *free_start = 0x0;        // Points to the beginning of the freelist
 char *free_end = 0x0;          // Points to the end of the freelist
 size_t free_length;            // Length of freelist
+size_t bigblocks;              // Counter for the amount of big blocks in heap
 
 // Function declerations
 int mm_init(void);
@@ -150,7 +153,6 @@ static void place(void *bp, size_t asize);
 static void updateLargest();
 static void printblock(void *bp);
 static void printfreelist();
-int mm_check(void);
 
 /*
  * mm_init - Initialize the malloc package.
@@ -169,7 +171,7 @@ int mm_init(void)
     // Initalise the prologue and epilogue blocks
     PUT(HDRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
     PUT(FTRP(heap_start), PACK(DSIZE+OVERHEAD, 1));
-    PUT(HDRP(NEXT_BLKP(heap_start)), PACK(0, 1));
+    PUT(HDRP(NEXT_BLKP(heap_start)), PACK(0, 1)); // epilogue (End)
 
     //Initalise the free list variables
     free_start = NULL;
@@ -178,6 +180,7 @@ int mm_init(void)
     NEXT_FREE(heap_start) = NULL;
     PREV_FREE(heap_start) = NULL;
 
+    bigblocks = 0;
 
     // Extend the heap
     if(extend_heap(CHUNKSIZE/WSIZE) == NULL){
@@ -206,19 +209,23 @@ void *mm_malloc(size_t size)
 
 	// Align the size
     asize = ALIGN(size + SIZE_T_SIZE);
-
-	// Find fit. If no fit is found, extend the heap
-    if((bp = find_fit(asize)) == NULL){
-
-	    // Extend the heap by the larger of the two: Aligned size or chunksize (2^12)
-    	extendsize = MAX(asize,CHUNKSIZE);
-
+    extendsize = MAX(asize,CHUNKSIZE);
+	
+	//Find fit. If no fit is found, extend the heap
+	// Extend the heap by the larger of the two: Aligned size or chunksize (2^12)
+    if(asize >= BIGB && !bigblocks){
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
             return NULL;
         }
     }
+    else {
+        if((bp = find_fit(asize)) == NULL){
+            if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
+                return NULL;
+            }
+        }
+    }
 
-	// Place the block at the found location
     place(bp, asize);
     return bp;
 }
@@ -272,12 +279,15 @@ void *mm_realloc(void *ptr, size_t size)
         return ptr;
     }
 
+    // What if asize is smaller than current size?
+
     size_t prevSize = GET_SIZE(HDRP(PREV_BLKP(ptr)));
     size_t nextSize = GET_SIZE(HDRP(NEXT_BLKP(ptr)));
+    size_t bsize;
 
     //If the next block is free, and there is enough space for the new size in the current block and next block combined, extend the block
     if(!GET_ALLOC(HDRP(NEXT_BLKP(ptr)))){
-        size_t bsize = currSize + nextSize;
+        bsize = currSize + nextSize;
         if(asize <= bsize){
             if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
                 removefree(NEXT_BLKP(ptr));
@@ -297,11 +307,11 @@ void *mm_realloc(void *ptr, size_t size)
             }
         }
     }
-    
+
 	// If the previous block is free, and there is enough space for the new size in the prev and curr block combined,
 	// move the data to the previous block and combine the blocks.
     if(!GET_ALLOC(HDRP(PREV_BLKP(ptr)))){
-        size_t bsize = currSize + prevSize;
+        bsize = currSize + prevSize;
         if(asize <= bsize){
             if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
                 prev = PREV_BLKP(ptr);
@@ -330,7 +340,7 @@ void *mm_realloc(void *ptr, size_t size)
 	// If both of the blocks are free and there is enough space in all of them combined, move data and resize the block.
     if(!GET_ALLOC(HDRP(PREV_BLKP(ptr))) &&
        !GET_ALLOC(HDRP(NEXT_BLKP(ptr)))){
-        size_t bsize = prevSize + currSize + nextSize;
+        bsize = prevSize + currSize + nextSize;
         if(asize <= bsize){
             if((bsize - asize) >= (DSIZE + OVERHEAD)){
                 prev = PREV_BLKP(ptr);
@@ -379,7 +389,7 @@ static void *find_fit(size_t size) {
     int min = 0;
     int max = free_length;
 
-    // Search for a fit from both ends of the free list
+    // Search for a fit from both ends of the freelist
     while(min < max) {
         if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
             return start;
@@ -394,7 +404,7 @@ static void *find_fit(size_t size) {
         end = PREV_FREE(end);
     }
 
-    //No fit, need to extend
+	// No fit, need to extend heap
     return NULL;
 }
 
@@ -411,21 +421,20 @@ static void *extend_heap(size_t words)
     char *bp;
     size_t size;
 
-    // Allocate an even number of words to maintain alignment
+    // Allocate an even number of words to maintain alignment 
     size = (words % 2) ? (words+1) * WSIZE : words * WSIZE;
     if((bp = mem_sbrk(size)) == (void *)-1){
         return NULL;
     }
 
     // Initialize free block header/footer and the epilogue header 
-    PUT(HDRP(bp), PACK(size, 0));         // Free block header 
-    PUT(FTRP(bp), PACK(size, 0));         // Free block footer 
-    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); // New epilogue header 
+    PUT(HDRP(bp), PACK(size, 0));         // free block header 
+    PUT(FTRP(bp), PACK(size, 0));         // free block footer 
+    PUT(HDRP(NEXT_BLKP(bp)), PACK(0, 1)); // new epilogue header
 
-	// Add block to free list
     newfree(bp);
 
-    // Coalesce if the previous block was free 
+    // Coalesce if the previous block was free
     return coalesce(bp);
 
 }
@@ -439,8 +448,13 @@ static void *extend_heap(size_t words)
 static void place(void *bp, size_t asize)
 {
     size_t bsize = GET_SIZE(HDRP(bp));
+    if(bsize >= BIGB){
+        if (bigblocks){
+            bigblocks--;
+        }
+    }
 
-    // More room than necessary, split into new free block
+    // More room, split into new free block
     if ((bsize - asize) >= (DSIZE + OVERHEAD)) {
         removefree(bp);
         PUT(HDRP(bp), PACK(asize, 1));
@@ -449,6 +463,9 @@ static void place(void *bp, size_t asize)
         PUT(HDRP(bp), PACK(bsize-asize, 0));
         PUT(FTRP(bp), PACK(bsize-asize, 0));
         newfree(bp);
+        if((bsize-asize) >= BIGB){
+            bigblocks++;
+        }
     }
 	// If current block + next block fit perfectly, there is no need for making a new free block
     else {
@@ -460,104 +477,103 @@ static void place(void *bp, size_t asize)
 
 /*
  * newfree - Adding a free block into the free list.
- * 
  */
 void newfree(void *bp)
 {
-    // Get old first pointer on free list 
-    void *old_freestart = free_start;
-
-    // newFree points to old first free 
-    NEXT_FREE(bp) = old_freestart;
+    if(GET_SIZE(HDRP(bp)) >= BIGB){
+        bigblocks++;
+    }
+	
+    // newFree points to old free_start 
+    NEXT_FREE(bp) = free_start;
 
     // Previous free to new free block is 0 (end) 
     PREV_FREE(bp) = NULL;
 
-    // Old first free previous free points to new free block 
-    if (old_freestart != NULL){
-        PREV_FREE(old_freestart) = bp;
+    // Old first free previous free points to new free block
+    if (free_start != NULL){
+        PREV_FREE(free_start) = bp;
     }
 	
     // Prolouge header points to new free block 
     free_start = bp;
-    
-	// If the length of the freelist is 0, free_start and free_end are the same block
+	
+    // If the length of the freelist is 0, free_start and free_end are the same block
     if (free_length == 0) {
         free_end = free_start;
     }
-	
     free_length++;
 }
 
 /*
  * coalesce - Boundary tag coalescing. 
  * There are four seperate cases: 
- *   - 1. Both previous and next blocks are free. Nothing to coalesce.
- *   - 2. Next block is free. Remove it from free list, and coalesce.
- *   - 3. Previous block is free. Remove current block from free list and coalesce with previous.
- *   - 4. Both previous and next are free. Remove next and current from free list, coalesce with previous.
+ *   1. Both previous and next blocks are free. Nothing to coalesce.
+ *   2. Next block is free. Remove it from free list, and coalesce.
+ *   3. Previous block is free. Remove current block from free list and coalesce with previous.
+ *   4. Both previous and next are free. Remove next and current from free list, coalesce with previous.
  * Return ptr to coalesced block
  */
 static void *coalesce(void *bp)
 {
-    size_t prev_alloc = GET_ALLOC(FTRP(PREV_BLKP(bp)));
-    size_t next_alloc = GET_ALLOC(HDRP(NEXT_BLKP(bp)));
+    void *nextbp = NEXT_BLKP(bp);
+    void *prevbp = PREV_BLKP(bp);
+    size_t prev_alloc = GET_ALLOC(FTRP(prevbp));
+    size_t next_alloc = GET_ALLOC(HDRP(nextbp));
     size_t size = GET_SIZE(HDRP(bp));
 
     // Next and prev are both allocated, nothing to coalesce
     if (prev_alloc && next_alloc) {         // Case 1 
         return bp;
     }
-	
     // Next is free, remove/bypass it from freelist before coalescing
     else if (prev_alloc && !next_alloc){    // Case 2 
-        removefree(NEXT_BLKP(bp));
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
+        void* nextbp = NEXT_BLKP(bp);
+        removefree(nextbp);
+        size += GET_SIZE(HDRP(nextbp));
         PUT(HDRP(bp), PACK(size, 0));
         PUT(FTRP(bp), PACK(size, 0));
     }
-	
-    // Previous is free, remove/bypass current from freelist before coalescing
+    // Previous is free, remove/bypass it from freelist before coalescing
     else if (!prev_alloc && next_alloc){    // Case 3 
-        removefree(PREV_BLKP(bp));
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        NEXT_FREE(PREV_BLKP(bp)) = NEXT_FREE(bp);
-        PREV_FREE(PREV_BLKP(bp)) = NULL;
+        void *prevbp = PREV_BLKP(bp);
+        removefree(prevbp);
+        size += GET_SIZE(HDRP(prevbp));
+        NEXT_FREE(prevbp) = NEXT_FREE(bp);
+        PREV_FREE(prevbp) = NULL;
         PUT(FTRP(bp), PACK(size, 0));
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
-		
+        bp = prevbp;
+        PUT(HDRP(bp), PACK(size, 0));
         if(NEXT_FREE(bp) != NULL){
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
-		
         free_start = bp;
         if(free_length <= 1){
             free_end = bp;
         }
     }
-	
     // Both next and prev are free, remove/bypass both from freelist before coalescing
     else {                                  // Case 4 
-        removefree(NEXT_BLKP(bp));
-        removefree(PREV_BLKP(bp));
-        size += GET_SIZE(HDRP(PREV_BLKP(bp)));
-        size += GET_SIZE(HDRP(NEXT_BLKP(bp)));
-        NEXT_FREE(PREV_BLKP(bp)) = NEXT_FREE(bp);
-        PREV_FREE(PREV_BLKP(bp)) = NULL;
-        PUT(HDRP(PREV_BLKP(bp)), PACK(size, 0));
-        PUT(FTRP(NEXT_BLKP(bp)), PACK(size, 0));
-        bp = PREV_BLKP(bp);
-		
+        prevbp = PREV_BLKP(bp);
+        nextbp = NEXT_BLKP(bp);
+        removefree(nextbp);
+        removefree(prevbp);
+        size += GET_SIZE(HDRP(prevbp));
+        size += GET_SIZE(HDRP(nextbp));
+        NEXT_FREE(prevbp) = NEXT_FREE(bp);
+        PREV_FREE(prevbp) = NULL;
+        PUT(HDRP(prevbp), PACK(size, 0));
+        PUT(FTRP(nextbp), PACK(size, 0));
+        bp = prevbp;
         if(NEXT_FREE(bp) != NULL){
             PREV_FREE(NEXT_FREE(bp)) = bp;
         }
-		
         free_start = bp;
         if(free_length <= 1){
             free_end = bp;
         }
     }
+	
     return bp;
 }
 
@@ -575,14 +591,14 @@ void removefree(void *bp)
     else {
         free_start = NEXT_FREE(bp);
     }
-	
-	// Rerouting the prev-pointer of the next block
+    // Rerouting the prev-pointer of the next block
     if(NEXT_FREE(bp) != NULL){
         PREV_FREE(NEXT_FREE(bp)) = PREV_FREE(bp);
     }
     if (bp == free_end) {
         free_end = PREV_FREE(bp);
     }
+
     PREV_FREE(bp) = NULL;
     NEXT_FREE(bp) = NULL;
     free_length--;
@@ -601,7 +617,7 @@ static void printblock(void *bp)
     falloc = GET_ALLOC(FTRP(bp));
 
     if (hsize == 0) {
-        printf("%p: EOL\n", bp);
+        printf("%p: EOL\n", bp); fflush(stdout);
         return;
     }
 
@@ -609,6 +625,7 @@ static void printblock(void *bp)
            hsize, (halloc ? 'a' : 'f'),
            PREV_FREE(bp), NEXT_FREE(bp),
            fsize, (falloc ? 'a' : 'f'));
+		   fflush(stdout);
 }
 
 /*
