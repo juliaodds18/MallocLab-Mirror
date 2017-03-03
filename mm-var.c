@@ -399,7 +399,6 @@ void *mm_realloc(void *ptr, size_t size)
     if ((newptr = extend_heap(extendsize/WSIZE)) == NULL) {
         return NULL;
     }
-    newptr = mm_malloc(asize);
     memcpy(newptr, ptr, (asize - OVERHEAD));
     mm_free(ptr);
     return newptr;
