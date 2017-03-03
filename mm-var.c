@@ -395,7 +395,7 @@ void *mm_realloc(void *ptr, size_t size)
     }
 
 	// Find a new block with enough space, allocate it, copy data there and free old block
-    extendsize = MAX((asize,CHUNKSIZE);
+    extendsize = MAX(asize,CHUNKSIZE);
     if ((newptr = extend_heap(extendsize/WSIZE)) == NULL) {
         return NULL;
     }
