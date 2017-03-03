@@ -137,6 +137,7 @@ char *free_start = 0x0;        // Points to the beginning of the freelist
 char *free_end = 0x0;          // Points to the end of the freelist
 size_t free_length;            // Length of freelist
 size_t bigblocks;              // Counter for the amount of big blocks in heap
+size_t row_allocs;
 
 // Function declerations
 int mm_init(void);
@@ -161,6 +162,7 @@ void printfreelist();
  */
 int mm_init(void)
 {
+    row_allocs = 0;
     // Allocate space for the heap
     if((heap_start = mem_sbrk(6*WSIZE)) == (void *)-1){
         return -1;
@@ -200,6 +202,7 @@ int mm_init(void)
  */
 void *mm_malloc(size_t size)
 {
+    row_allocs++;
     size_t asize;      // Adjusted block size
     size_t extendsize; // Amount to extend heap if no fit
     char *bp;
@@ -211,17 +214,18 @@ void *mm_malloc(size_t size)
 
 	// Align the size
     asize = ALIGN(size + SIZE_T_SIZE);
-    extendsize = MAX(asize,CHUNKSIZE);
 
 	//Find fit. If no fit is found, extend the heap
 	// Extend the heap by the larger of the two: Aligned size or chunksize (2^12)
-    if(asize >= BIGB && !bigblocks){
+    if(row_allocs > 400 || (asize >= BIGB && !bigblocks)){
+        extendsize = MAX(asize,CHUNKSIZE);
         if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
             return NULL;
         }
     }
     else {
         if((bp = find_fit(asize)) == NULL){
+            extendsize = MAX(asize,CHUNKSIZE);
             if ((bp = extend_heap(extendsize/WSIZE)) == NULL) {
                 return NULL;
             }
@@ -504,6 +508,8 @@ static void newfree(void *bp)
     if(GET_SIZE(HDRP(bp)) >= BIGB){
         bigblocks++;
     }
+
+    row_allocs = 0;
 
     // newFree points to old free_start
     NEXT_FREE(bp) = free_start;
