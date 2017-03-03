@@ -154,6 +154,7 @@ static void place(void *bp, size_t asize);
 static void printblock(void *bp);
 void printfreelist(void);
 int mm_check(void);
+void printfreelist();
 
 /*
  * mm_init - Initialize the malloc package.
