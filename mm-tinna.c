@@ -153,6 +153,7 @@ static void place(void *bp, size_t asize);
 static void updateLargest();
 static void printblock(void *bp);
 static void printfreelist();
+static int mm_check(void);
 
 /*
  * mm_init - Initialize the malloc package.
@@ -163,7 +164,7 @@ int mm_init(void)
     if((heap_start = mem_sbrk(6*WSIZE)) == (void *)-1){
         return -1;
     }
-
+    mm_check();
     // WSIZE padding before the heap_start is moved
     PUT(heap_start, 0);
     heap_start += DSIZE;
@@ -648,7 +649,7 @@ static void printfreelist()
  */
 int mm_check(void)
 {
-	//Goung through free list, checking to see if every block in the free list has its alloc-bit set to 0.
+    //Goung through free list, checking to see if every block in the free list has its alloc-bit set to 0.
     printf("Is every block in the free list actually free?\n"); fflush(stdout);
     char* iter;
 
@@ -685,7 +686,7 @@ int mm_check(void)
     printf("Is every free block actually in the free list? \n"); fflush(stdout);
 
     iter = heap_start;
-    while (GET_SIZE(HDRP(iter) > 0) {
+    while (GET_SIZE(HDRP(iter)) > 0) {
         int isalloc = GET_ALLOC(HDRP(iter));
 
         if(!isalloc) {
@@ -710,7 +711,7 @@ int mm_check(void)
     printf("Do any allocd blocks overlap?\n"); fflush(stdout);
 
     iter = heap_start;
-    while (GET_SIZE(HDRP(iter) > 0) {
+    while (GET_SIZE(HDRP(iter)) > 0) {
         int headersize = GET_SIZE(HDRP(iter));
         char* footer = FTRP(iter);
         int footersize = GET_SIZE(footer);
@@ -725,9 +726,10 @@ int mm_check(void)
     // Check if pointers in heap point to valid addresses. If they are less than heap_start or greater than heap_end, then they are invalid.
 
     printf("Do pointers in heap point to valid addresses? \n"); fflush(stdout);
-
+    
+    heap_end = mem_heap_hi()-7;
     iter = heap_start;
-    while (GET_SIZE(HDRP(iter) > 0) {
+    while (GET_SIZE(HDRP(iter)) > 0) {
         char* next = NEXT_BLKP(iter);
 
         if(next < heap_start || next > heap_end) {
@@ -736,8 +738,8 @@ int mm_check(void)
 	   iter = next;
     }
 
-    //iter = heap_end;
-    while(iter >= heap_start) {
+    iter = mem_heap_hi()-7;
+    while(iter > heap_start) {
         char* prev = PREV_BLKP(iter);
 
         if(prev < heap_start || prev > heap_end) {
