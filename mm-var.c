@@ -288,7 +288,7 @@ void *mm_realloc(void *ptr, size_t size)
     size_t bsize;
     size_t extendsize;
 
-    // Special case where epilogue block is the next block
+    // Special case if we are extending at the end of heap
     if(!nextSize){
         extendsize = MAX((asize-currSize),CHUNKSIZE);
         if (extend_heap(extendsize/WSIZE) == NULL) {
