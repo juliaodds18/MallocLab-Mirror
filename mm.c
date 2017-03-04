@@ -412,11 +412,11 @@ static void *find_fit(size_t size) {
 
     // Search for a fit from both ends of the freelist
     while(min < max) {
-        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
-            return start;
-        }
         if (size <= ((size_t)GET_SIZE(HDRP(end)))) {
             return end;
+        }
+        if (size <= ((size_t)GET_SIZE(HDRP(start)))) {
+            return start;
         }
 
         min++;
